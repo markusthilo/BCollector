@@ -1,1 +1,1 @@
-Zero risk Monitored Import pgp encryted files to a beckup and decrypted to a target
+Zero risk Monitored Import pgp encryted files to a backup and decrypted to a target
