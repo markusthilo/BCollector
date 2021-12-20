@@ -47,7 +47,7 @@ class Logger:
 		#		logging.getLogger().addHandler(handler)
 		#logging.info(f'Start logging to {filename}')
 		#stderr.write = self.__handler_stderr__
-		self.filename = filename
+		self.filename = filename	# log to file when used in the real world
 
 	def __handler_stderr__(self, stream):
 		'Handle write stream from stderr'
