@@ -89,7 +89,7 @@ class PGPDecoder:
 		raise RuntimeError('Decoder returned error')
 
 class FileOperations:
-	'Collection of asic file operations'
+	'Collection of basic file operations'
 
 	def __init__(self, dirpath):
 		'Set source path'
