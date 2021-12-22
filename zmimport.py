@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.1_2021-12-19'
+__version__ = '0.1_2021-12-22'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -20,7 +20,7 @@ from time import sleep
 from datetime import datetime
 from configparser import ConfigParser
 from csv import DictReader, DictWriter
-from csv import writer as SequenceWtiter
+from csv import writer as SequenceWriter
 from argparse import ArgumentParser, FileType
 
 class Logger:
@@ -70,6 +70,9 @@ class Config:
 		self.backuppath = Path(config['PLACES']['backuppath'])
 		self.csvpath = Path(config['FILELIST']['filepath'])
 		self.pgp_cmd = Path(config['PGP']['command'])
+		self.triggerfile = Path(config['TRIGGER']['filepath'])
+		self.updates = [ t.strip(' ') for t in config['TRIGGER']['time'].split(',') ]
+		self.sleep = config['TRIGGER']['sleep']
 
 class PGPDecoder:
 	'Use command line PGP/GPG to decode'
@@ -190,7 +193,7 @@ class Backup(FileOperations):
 					self.putted.add(row['filename_dec'])
 		else:	# creste csv file if not existend
 			with open(csvpath, 'w', newline='') as f:
-				writer = SequenceWtiter(f)
+				writer = SequenceWriter(f)
 				writer.writerow(self.fieldnames)
 
 	def remove(self, filename):
@@ -210,16 +213,29 @@ class Transfer:
 	'Functionality to process the whole file transfer'
 
 	def __init__(self, config):
-		'Create file transfer object with config'
-		self.config = config
-		self.decoder = PGPDecoder(self.config.pgp_cmd)
-		self.source = Source(self.config.sourcepath)
-		logging.debug(f'Source is {self.config.sourcepath}')
-		self.target = Target(self.config.targetpath)
-		logging.debug(f'Target is {self.config.targetpath}')
-		self.backup = Backup(self.config.backuppath, self.config.csvpath)
-		logging.debug(f'Backup is {self.config.backuppath}')
-		logging.debug(f'Files / transfers will be stored in {self.config.csvpath}')
+		'File transfer'
+		self.decoder = PGPDecoder(config.pgp_cmd)
+		self.source = Source(config.sourcepath)
+		logging.debug(f'Source is {config.sourcepath}')
+		self.target = Target(config.targetpath)
+		logging.debug(f'Target is {config.targetpath}')
+		self.backup = Backup(config.backuppath, config.csvpath)
+		logging.debug(f'Backup is {config.backuppath}')
+		logging.debug(f'Files / transfers will be stored in {config.csvpath}')
+		newfiles = list()
+		for new in self.__fetchnew__():
+			targetpath, targetsum, ts_put = self.target.put(self.backup.path / new['filename_dec'])
+			self.backup.remove(new['filename_dec'])
+			newfiles.append({
+				'filename_orig': new['filename_orig'],
+				'sum_orig': new['sum_orig'],
+				'ts_fetch': new['ts_fetch'],
+				'filename_dec': new['filename_dec'],
+				'sum_dec': targetsum,
+				'ts_put': ts_put
+			})
+		if newfiles != list():
+			self.backup.update_csv(newfiles)
 
 	def __fetchnew__(self):
 		'Fetch new files from source'
@@ -245,22 +261,23 @@ class Transfer:
 					'filename_dec': decodedpath.name,
 				}
 
-	def update(self):
-		'Proceed the Transfer from source to target via backup'
-		newfiles = list()
-		for new in self.__fetchnew__():
-			targetpath, targetsum, ts_put = self.target.put(self.backup.path / new['filename_dec'])
-			self.backup.remove(new['filename_dec'])
-			newfiles.append({
-				'filename_orig': new['filename_orig'],
-				'sum_orig': new['sum_orig'],
-				'ts_fetch': new['ts_fetch'],
-				'filename_dec': new['filename_dec'],
-				'sum_dec': targetsum,
-				'ts_put': ts_put
-			})
-		if newfiles != list():
-			self.backup.update_csv(newfiles)
+class MainLoop:
+	'Main loop waiting for triggers'
+
+	def __init__(self, config):
+		'Initiate main loop'
+		print(config.triggerfile)
+		print(config.updates)
+		print(config.sleep)
+		print(datetime.now().strftime('%H:%M'))
+		while True:	# check if trigger file exists or time matches
+			if config.triggerfile.exists():
+				remove(config.triggerfile)
+				Transfer(config)
+			elif datetime.now().strftime('%H:%M') == config.updates:
+				Transfer(config)
+		else:
+			sleep(config.sleep)
 
 if __name__ == '__main__':	# start here if called as application
 	argparser = ArgumentParser(description=__description__)
@@ -270,5 +287,4 @@ if __name__ == '__main__':	# start here if called as application
 	args = argparser.parse_args()
 	config = Config(args.config)
 	log = Logger(config.loglevel, config.logfile)
-	transfer = Transfer(config)
-	transfer.update()
+	MainLoop(config)
