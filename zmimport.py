@@ -26,7 +26,7 @@ from argparse import ArgumentParser, FileType
 class Logger:
 	'Logging for this tool'
 
-	def __init__(self, level, filename, handlers=[logging.StreamHandler(stdout)]):
+	def __init__(self, level, filename):
 		'Initiate logging by given level and to given file'
 		logging.basicConfig(
 			level={
@@ -36,18 +36,13 @@ class Logger:
 				'error': logging.ERROR,
 				'critical': logging.CRITICAL
 			}[level],
-			#filename = filename,
-			stream = stdout,
+			filename = filename,
 			format = '%(asctime)s %(levelname)s: %(message)s',
 			datefmt = '%Y-%m-%d %H:%M:%S'
 		)
-		#logging.getLogger().addHandler(logging.StreamHandler(stream=stdout))
-		#if handlers != None:
-		#	for handler in handlers:
-		#		logging.getLogger().addHandler(handler)
-		#logging.info(f'Start logging to {filename}')
-		#stderr.write = self.__handler_stderr__
-		self.filename = filename	# log to file when used in the real world
+		logging.info(f'Start logging to {filename}')
+		stderr.write = self.__handler_stderr__	# redirect stderr to logfile
+		self.filename = filename	# log to file
 
 	def __handler_stderr__(self, stream):
 		'Handle write stream from stderr'
@@ -188,7 +183,6 @@ class Backup(FileOperations):
 					)
 					raise RuntimeError('Mismatching fieldnames in CSV file')
 				for row in reader:	# get the already handled files from csv file
-					print(row)
 					self.fetched.add(row['filename_orig'])
 					self.putted.add(row['filename_dec'])
 		else:	# creste csv file if not existend
@@ -236,6 +230,7 @@ class Transfer:
 			})
 		if newfiles != list():
 			self.backup.update_csv(newfiles)
+		sleep(60)	# wait one minute to make shure not to fetch again at same time
 
 	def __fetchnew__(self):
 		'Fetch new files from source'
@@ -266,15 +261,12 @@ class MainLoop:
 
 	def __init__(self, config):
 		'Initiate main loop'
-		print(config.triggerfile)
-		print(config.updates)
-		print(config.sleep)
-		print(datetime.now().strftime('%H:%M'))
+		logging.info('Starting main loop')
 		while True:	# check if trigger file exists or time matches
 			if config.triggerfile.exists():
 				remove(config.triggerfile)
 				Transfer(config)
-			elif datetime.now().strftime('%H:%M') == config.updates:
+			elif datetime.now().strftime('%H:%M') in config.updates:
 				Transfer(config)
 		else:
 			sleep(config.sleep)
