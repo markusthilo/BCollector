@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.1_2021-12-23'
+__version__ = '0.1_2021-12-27'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -14,10 +14,11 @@ from tkinter.messagebox import showinfo
 from datetime import datetime
 from os import remove, path
 from pathlib import Path
-from configparser import ConfigParser
 
 class Main(Tk):
 	'Main window'
+
+	PATH_TO_TRIGGERFILE
 
 	def __init__(self, icon_base64):
 		'Define the main window'
@@ -32,9 +33,7 @@ class Main(Tk):
 
 	def importnow(self):
 		'Generate trigger file'
-		config = ConfigParser()
-		config.read(Path(path.dirname(__file__)) / 'zminow.conf')
-		with open(Path(config['TRIGGER']['filepath']), 'w') as f:
+		with open(self.PATH_TO_TRIGGERFILE, 'w') as f:
 			f.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 		showinfo(title='ZMIport', message='Import is triggered')
 		self.destroy()
