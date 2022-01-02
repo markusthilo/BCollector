@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.2_2021-12-31'
+__version__ = '0.1_2021-12-31'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -55,25 +55,19 @@ class Config:
 	def __init__(self, configfile):
 		'Get configuration from file and initiate logging'
 		if configfile == None:
-			configfile = Path(path.dirname(__file__)) / 'zmimport.conf'
+			configfile = Path(path.dirname(__file__)) / 'zmimport_v0.1.conf'
 		config = ConfigParser()
 		config.read(configfile)
 		self.loglevel = config['LOGGING']['level']
 		self.logfile = Path(config['LOGGING']['filepath'])
+		self.sourcepath = Path(config['PLACES']['sourcepath'])
+		self.targetpath = Path(config['PLACES']['targetpath'])
+		self.backuppath = Path(config['PLACES']['backuppath'])
 		self.csvpath = Path(config['FILELIST']['filepath'])
 		self.pgp_cmd = Path(config['PGP']['command'])
 		self.triggerfile = Path(config['TRIGGER']['filepath'])
 		self.updates = [ t.strip(' ') for t in config['TRIGGER']['time'].split(',') ]
 		self.sleep = config['TRIGGER']['sleep']
-		self.sourcepath = Path(config['SOURCE']['path'])
-		self.backuppath = Path(config['BACKUP']['path'])
-		self.targets = dict()
-		for section in config.sections():
-			if section[:6] == 'TARGET':
-				if section == 'TARGET':
-					self.targetpath = Path(config['TARGET']['path'])
-				else:
-					self.targets[config[section]['path']] = config[section]['pattern']
 
 class PGPDecoder:
 	'Use command line PGP/GPG to decode'
@@ -215,24 +209,15 @@ class Transfer:
 	def __init__(self, config):
 		'File transfer'
 		self.decoder = PGPDecoder(config.pgp_cmd)
-		logging.debug(f'Files / transfers will be stored in {config.csvpath}')
 		self.source = Source(config.sourcepath)
 		logging.debug(f'Source is {config.sourcepath}')
-		self.backup = Backup(config.backuppath, config.csvpath)
-		logging.debug(f'Backup is {config.backuppath}')
 		self.target = Target(config.targetpath)
 		logging.debug(f'Target is {config.targetpath}')
-		self.targets = dict()
-		for path, pattern in config.targets.items():
-			logging.debug(f'Target is {path} for regex pattern "{pattern}"')
-			self.targets[pattern] = Target(path)
+		self.backup = Backup(config.backuppath, config.csvpath)
+		logging.debug(f'Backup is {config.backuppath}')
+		logging.debug(f'Files / transfers will be stored in {config.csvpath}')
 		newfiles = list()
 		for new in self.__fetchnew__():
-			for pattern, transfer in self.targets.items():
-				print(new, pattern, transfer, match(pattern()
-		exit()
-		pass
-		for i in 1:
 			targetpath, targetsum, ts_put = self.target.put(self.backup.path / new['filename_dec'])
 			self.backup.remove(new['filename_dec'])
 			newfiles.append({
@@ -294,8 +279,4 @@ if __name__ == '__main__':	# start here if called as application
 	args = argparser.parse_args()
 	config = Config(args.config)
 	log = Logger(config.loglevel, config.logfile)
-	if logging.root.level == logging.DEBUG:
-		logging.info('Starting file transfer on debug level now and for once')
-		Transfer(config)
-	else:
-		MainLoop(config)
+	MainLoop(config)
