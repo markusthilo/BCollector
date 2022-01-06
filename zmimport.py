@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.2_2021-12-31'
+__version__ = '0.2_2022-01-06'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -41,13 +41,7 @@ class Logger:
 			datefmt = '%Y-%m-%d %H:%M:%S'
 		)
 		logging.info(f'Start logging to {filename}')
-		stderr.write = self.__handler_stderr__	# redirect stderr to logfile
 		self.filename = filename	# log to file
-
-	def __handler_stderr__(self, stream):
-		'Handle write stream from stderr'
-		if stream != '\n':
-			logger.error(stream)
 
 class Config:
 	'Handle the config file'
@@ -73,7 +67,7 @@ class Config:
 				if section == 'TARGET':
 					self.targetpath = Path(config['TARGET']['path'])
 				else:
-					self.targets[config[section]['path']] = config[section]['pattern']
+					self.targets[Path(config[section]['path'])] = config[section]['pattern']
 
 class PGPDecoder:
 	'Use command line PGP/GPG to decode'
@@ -214,37 +208,41 @@ class Transfer:
 
 	def __init__(self, config):
 		'File transfer'
-		self.decoder = PGPDecoder(config.pgp_cmd)
-		logging.debug(f'Files / transfers will be stored in {config.csvpath}')
-		self.source = Source(config.sourcepath)
-		logging.debug(f'Source is {config.sourcepath}')
-		self.backup = Backup(config.backuppath, config.csvpath)
-		logging.debug(f'Backup is {config.backuppath}')
-		self.target = Target(config.targetpath)
-		logging.debug(f'Target is {config.targetpath}')
-		self.targets = dict()
-		for path, pattern in config.targets.items():
-			logging.debug(f'Target is {path} for regex pattern "{pattern}"')
-			self.targets[pattern] = Target(path)
-		newfiles = list()
-		for new in self.__fetchnew__():
-			for pattern, transfer in self.targets.items():
-				print(new, pattern, transfer, match(pattern()
-		exit()
-		pass
-		for i in 1:
-			targetpath, targetsum, ts_put = self.target.put(self.backup.path / new['filename_dec'])
-			self.backup.remove(new['filename_dec'])
-			newfiles.append({
-				'filename_orig': new['filename_orig'],
-				'sum_orig': new['sum_orig'],
-				'ts_fetch': new['ts_fetch'],
-				'filename_dec': new['filename_dec'],
-				'sum_dec': targetsum,
-				'ts_put': ts_put
-			})
-		if newfiles != list():
-			self.backup.update_csv(newfiles)
+		try:
+			self.decoder = PGPDecoder(config.pgp_cmd)
+			logging.debug(f'File / transfer infos will be stored in {config.csvpath}')
+			self.source = Source(config.sourcepath)
+			logging.debug(f'Source is {config.sourcepath}')
+			self.backup = Backup(config.backuppath, config.csvpath)
+			logging.debug(f'Backup is {config.backuppath}')
+			for path, pattern in config.targets.items():
+				logging.debug(f'Target is {path} for regex pattern "{pattern}"')
+			logging.debug(f'Basic target is {config.targetpath}')
+			newfiles = list()
+			for filename_orig, sum_orig, ts_fetch, filename_dec in self.__fetchnew__():
+				targetdir = None
+				for path, pattern in config.targets.items():
+					if match(pattern, filename_orig) != None:
+						targetdir = path
+						break
+				if targetdir == None:
+					targetdir = config.targetpath
+				logging.debug(f'{filename_dec} will be moved to {targetdir}')
+				target = Target(targetdir)
+				targetpath, targetsum, ts_put = target.put(self.backup.path / filename_dec)
+				self.backup.remove(filename_dec)
+				newfiles.append({
+					'filename_orig': filename_orig,
+					'sum_orig': sum_orig,
+					'ts_fetch': ts_fetch,
+					'filename_dec': filename_dec,
+					'sum_dec': targetsum,
+					'ts_put': ts_put
+				})
+			if newfiles != list():
+				self.backup.update_csv(newfiles)
+		except Exception as e:
+			logging.error(e)
 		sleep(60)	# wait one minute to make shure not to fetch again at same time
 
 	def __fetchnew__(self):
@@ -264,12 +262,7 @@ class Transfer:
 				logging.info(f'Copied {sourcepath} to {backuppath}')
 				decodedpath = self.decoder.decode(backuppath, self.backup.path)
 				logging.info(f'Decoded {backuppath} to {decodedpath}')
-				yield {
-					'filename_orig': sourcefile,
-					'sum_orig': sum_orig,
-					'ts_fetch': ts_fetch,
-					'filename_dec': decodedpath.name,
-				}
+				yield sourcefile, sum_orig, ts_fetch, decodedpath.name
 
 class MainLoop:
 	'Main loop waiting for triggers'
