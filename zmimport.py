@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.2_2022-01-06'
+__version__ = '0.2_2022-02-15'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -12,8 +12,11 @@ import logging
 from os import listdir, remove, path
 from shutil import copy2 as copyfile
 from pathlib import Path
+from lxml.html import parse as parse_html
+from urllib.request import urlopen
 from hashlib import sha256
 from sys import stdout, stderr
+from sys import exit as sysexit
 from re import match, sub
 from subprocess import Popen, PIPE
 from time import sleep
@@ -58,8 +61,14 @@ class Config:
 		self.pgp_cmd = Path(config['PGP']['command'])
 		self.triggerfile = Path(config['TRIGGER']['filepath'])
 		self.updates = [ t.strip(' ') for t in config['TRIGGER']['time'].split(',') ]
-		self.sleep = config['TRIGGER']['sleep']
-		self.sourcepath = Path(config['SOURCE']['path'])
+		self.sleep = int(config['TRIGGER']['sleep'])
+		self.sourcetype = config['SOURCE']['type']
+		if self.sourcetype.lower() == 'url':
+			self.sourcepath = config['SOURCE']['path']
+			self.xpath = config['SOURCE']['xpath']
+		else:
+			self.sourcepath = Path(config['SOURCE']['path'])
+			self.xpath = ''
 		self.backuppath = Path(config['BACKUP']['path'])
 		self.targets = dict()
 		for section in config.sections():
@@ -86,15 +95,46 @@ class PGPDecoder:
 		logging.error(f'Could not decrypt {encrypted} to {outfile}')
 		raise RuntimeError('Decoder returned error')
 
+class HttpFileTransfer:
+	'Tools to fetch files via HTTP'
+
+	def __init__(self, path, xpath):
+		'Set source path'
+		self.path = path
+		self.xpath = xpath
+
+	def basedir(self):
+		'List source files as set'
+		landing = parse_html(self.path)
+		return set(filename for filename in landing.xpath(self.xpath))
+
+	def download(self, filename, dstpath):
+		'Download given file and generate sha256'
+		sourcepath = f'{self.path}/{filename}'
+		filepath = dstpath / filename
+		logging.debug(f'downloading {sourcepath} to {dstpath}')
+		with urlopen(sourcepath) as response:
+			sourcefile = response.read()
+		with open(filepath, 'wb') as filehandler:
+			filelen = filehandler.write(sourcefile)
+		logging.debug(f'generated {sourcepath}')
+		if filelen != len(sourcefile):
+			logging.error(f'Source file has {len(sourcefile)} bytes but wrote {filelen} bytes')
+			raise RuntimeError(f'Error while downloading {sourcepath}')
+		logging.debug(f'Building sha256 for {filename}')
+		h = sha256()
+		h.update(sourcefile)
+		return sourcepath, filepath, h.hexdigest()
+
 class FileOperations:
 	'Collection of basic file operations'
 
-	def __init__(self, dirpath):
-		'Set source path'
-		self.path = dirpath
+	def __init__(self, path):
+		'Set path'
+		self.path = path
 
 	def ls(self):
-		'List source files as set'
+		'List files as set'
 		return set(listdir(self.path))
 
 	def fullpath(self, filename):
@@ -121,24 +161,41 @@ class FileOperations:
 		'Give timestamp for now'
 		return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-class Source(FileOperations):
+class Source(FileOperations, HttpFileTransfer):
 	'Source to import from'
+
+	def __init__(self, path, sourcetype, xpath):
+		'Set source path'
+		self.path = path
+		self.sourcetype = sourcetype
+		self.xpath = xpath
+
+	def listfiles(self):
+		'List files as set'
+		logging.debug('Getting source file lsit')
+		if self.sourcetype == 'url':
+			return super().basedir()
+		return super().ls()
 
 	def fetch(self, sourcefile, dstpath):
 		'Copy one file to given file (backup server is intended)'
-		sourcepath = self.fullpath(sourcefile)
-		copyfile(sourcepath, dstpath)
-		filepath = dstpath / sourcefile
-		sourcesum = self.sha256(sourcepath)
-		filesum = self.sha256(filepath)
-		logging.debug(
-			f'Copied {sourcepath} (checksum: {sourcesum}) to {filepath} (checksum: {filesum})'
-		)
-		if sourcesum == filesum:
-			return sourcepath, filepath, filesum, self.now()
-		remove(filepath)
-		logging.error(f'Could not copy {sourcepath} to {filepath}, removing {filepath}')
-		raise RuntimeError('Checksum mismatch on fetching file(s) from source')
+		if self.sourcetype == 'url':
+			sourcepath, filepath, filesum = self.download(sourcefile, dstpath)
+		else:
+			sourcepath = self.fullpath(sourcefile)
+			filepath = dstpath / sourcefile
+			copyfile(sourcepath, dstpath)
+			sourcesum = self.sha256(sourcepath)
+			filesum = self.sha256(filepath)
+			logging.debug(
+				f'Copied {sourcepath} (checksum: {sourcesum}) to {filepath} (checksum: {filesum})'
+			)
+			if sourcesum != filesum:
+				remove(filepath)
+				logging.error(f'Could not download / copy {sourcepath} to {filepath}, removing {filepath}')
+				raise RuntimeError('Checksum mismatch on fetching file(s) from source')
+		return sourcepath, filepath, filesum, self.now()
+
 
 class Target(FileOperations):
 	'Target to copy the files to'
@@ -211,7 +268,7 @@ class Transfer:
 		try:
 			self.decoder = PGPDecoder(config.pgp_cmd)
 			logging.debug(f'File / transfer infos will be stored in {config.csvpath}')
-			self.source = Source(config.sourcepath)
+			self.source = Source(config.sourcepath, config.sourcetype, config.xpath)
 			logging.debug(f'Source is {config.sourcepath}')
 			self.backup = Backup(config.backuppath, config.csvpath)
 			logging.debug(f'Backup is {config.backuppath}')
@@ -243,11 +300,12 @@ class Transfer:
 				self.backup.update_csv(newfiles)
 		except Exception as e:
 			logging.error(e)
-		sleep(60)	# wait one minute to make shure not to fetch again at same time
+		if logging.root.level != logging.DEBUG:
+			sleep(60)	# wait one minute to make shure not to fetch again at same time
 
 	def __fetchnew__(self):
 		'Fetch new files from source'
-		newonsource = self.source.ls() - self.backup.fetched	# filter for new files
+		newonsource = self.source.listfiles() - self.backup.fetched	# filter for new files
 		if newonsource == set():
 			logging.info(f'Did not find new file(s) on {self.source.path}')
 			return
@@ -290,5 +348,6 @@ if __name__ == '__main__':	# start here if called as application
 	if logging.root.level == logging.DEBUG:
 		logging.info('Starting file transfer on debug level now and for once')
 		Transfer(config)
+		sysexit(0)
 	else:
 		MainLoop(config)
