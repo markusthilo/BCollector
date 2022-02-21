@@ -59,6 +59,8 @@ class Config:
 		self.logfile = Path(config['LOGGING']['filepath'])
 		self.csvpath = Path(config['FILELIST']['filepath'])
 		self.pgp_cmd = Path(config['PGP']['command'])
+		#self.pgp_ppfile = Path(config['PGP']['passphrase-file'])
+		self.pgp_passphrase = config['PGP']['passphrase']
 		self.triggerfile = Path(config['TRIGGER']['filepath'])
 		self.updates = [ t.strip(' ') for t in config['TRIGGER']['time'].split(',') ]
 		self.sleep = int(config['TRIGGER']['sleep'])
@@ -81,14 +83,30 @@ class Config:
 class PGPDecoder:
 	'Use command line PGP/GPG to decode'
 
-	def __init__(self, cmd):
+	def __init__(self, cmd, passphrase):
 		'Create decoder by giving the command line'
 		self.cmd = cmd
+		self.passphrase = passphrase
 
 	def decode(self, encrypted, destdir):
 		'Decode pgp file and return generated file'
 		outfile = destdir / encrypted.stem
-		process = Popen((self.cmd, '--output', outfile, '--decrypt', encrypted))
+		print(
+			self.cmd,
+			'--pinentry-mode=loopback',
+			'--passphrase', self.passphrase,
+			'--output', outfile,
+			'--decrypt', encrypted
+		)
+		
+		
+		process = Popen((
+			self.cmd,
+			'--pinentry-mode=loopback',
+			'--passphrase', self.passphrase,
+			'--output', outfile,
+			'--decrypt', encrypted
+			))
 		process.wait()
 		if process.returncode == 0:
 			return outfile
@@ -106,7 +124,7 @@ class HttpFileTransfer:
 	def basedir(self):
 		'List source files as set'
 		landing = parse_html(self.path)
-		return set(filename for filename in landing.xpath(self.xpath))
+		return ( filename for filename in landing.xpath(self.xpath) )
 
 	def download(self, filename, dstpath):
 		'Download given file and generate sha256'
@@ -135,7 +153,7 @@ class FileOperations:
 
 	def ls(self):
 		'List files as set'
-		return set(listdir(self.path))
+		return ( f for f in self.path.iterdir() if f.is_file() )
 
 	def fullpath(self, filename):
 		'Return full path to given file'
@@ -174,11 +192,12 @@ class Source(FileOperations, HttpFileTransfer):
 		'List files as set'
 		logging.debug('Getting source file lsit')
 		if self.sourcetype == 'url':
-			return super().basedir()
-		return super().ls()
+			return set( fn for fn in super().basedir() if fn[-4:] == '.pgp' )
+		else:
+			return set( f for f in super().ls() if f.suffix == '.pgp' )
 
 	def fetch(self, sourcefile, dstpath):
-		'Copy one file to given file (backup server is intended)'
+		'Copy one file to given path (backup server is intended)'
 		if self.sourcetype == 'url':
 			sourcepath, filepath, filesum = self.download(sourcefile, dstpath)
 		else:
@@ -266,7 +285,7 @@ class Transfer:
 	def __init__(self, config):
 		'File transfer'
 		try:
-			self.decoder = PGPDecoder(config.pgp_cmd)
+			self.decoder = PGPDecoder(config.pgp_cmd, config.pgp_passphrase)
 			logging.debug(f'File / transfer infos will be stored in {config.csvpath}')
 			self.source = Source(config.sourcepath, config.sourcetype, config.xpath)
 			logging.debug(f'Source is {config.sourcepath}')
