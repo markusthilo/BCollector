@@ -59,7 +59,6 @@ class Config:
 		self.logfile = Path(config['LOGGING']['filepath'])
 		self.csvpath = Path(config['FILELIST']['filepath'])
 		self.pgp_cmd = Path(config['PGP']['command'])
-		#self.pgp_ppfile = Path(config['PGP']['passphrase-file'])
 		self.pgp_passphrase = config['PGP']['passphrase']
 		self.triggerfile = Path(config['TRIGGER']['filepath'])
 		self.updates = [ t.strip(' ') for t in config['TRIGGER']['time'].split(',') ]
@@ -190,11 +189,11 @@ class Source(FileOperations, HttpFileTransfer):
 
 	def listfiles(self):
 		'List files as set'
-		logging.debug('Getting source file lsit')
+		logging.debug('Getting source file list')
 		if self.sourcetype == 'url':
-			return set( fn for fn in super().basedir() if fn[-4:] == '.pgp' )
+			return set( fn for fn in self.basedir() if fn[-4:] == '.pgp' )
 		else:
-			return set( f for f in super().ls() if f.suffix == '.pgp' )
+			return set( f for f in self.ls() if f.suffix == '.pgp' )
 
 	def fetch(self, sourcefile, dstpath):
 		'Copy one file to given path (backup server is intended)'
@@ -214,7 +213,6 @@ class Source(FileOperations, HttpFileTransfer):
 				logging.error(f'Could not download / copy {sourcepath} to {filepath}, removing {filepath}')
 				raise RuntimeError('Checksum mismatch on fetching file(s) from source')
 		return sourcepath, filepath, filesum, self.now()
-
 
 class Target(FileOperations):
 	'Target to copy the files to'
