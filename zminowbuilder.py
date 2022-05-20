@@ -2,16 +2,14 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.1_2021-12-27'
+__version__ = '0.1_2022-05-20'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
 __description__ = 'Build zminow.exe using PyInstaller'
 
 import PyInstaller.__main__
-from shutil import copy2 as copyfile
 from pathlib import Path
-from sys import stdout, stderr
 from argparse import ArgumentParser
 
 if __name__ == '__main__':	# start here if called as application
