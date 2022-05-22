@@ -6,9 +6,9 @@ __version__ = '0.1_2022-05-20'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
-__description__ = 'Build zminow.exe using PyInstaller'
+__description__ = 'Build postup.exe using PyInstaller'
 
-import PyInstaller.__main__
+#import PyInstaller.__main__ ### DEBUG ###
 from pathlib import Path
 from argparse import ArgumentParser
 
@@ -20,17 +20,25 @@ if __name__ == '__main__':	# start here if called as application
 	args = argparser.parse_args()
 	filepath = args.filepath[0].as_posix()
 	zmidir = Path(__file__).resolve().parent
-	script_orig = zmidir / 'zminow.py'
-	script_copy = zmidir / 'zminow_tmp.py'
-	icon = zmidir / 'zminow_96.ico'
-	exe_name = 'zminow.exe'
+	script_orig = zmidir / 'postup.py'
+	script_copy = zmidir / 'postup_tmp.py'
+	icon = zmidir / 'postup_96.ico'
+	exe_name = 'postup.exe'
 	with open(script_orig, 'rt', encoding='utf8') as readf:
 		with open(script_copy, 'wt', encoding='utf8') as writef:
 			for line in readf:
-				if line[:15] == '\tTRIGGERFILE = ':
-					writef.write(f"\tTRIGGERFILE = '{filepath}'\n")
+
+				if line[:15] == '\tFIELDNAMES = ('caseno', 'dstdep')':
+					writef.write(f"\tFIELDNAMES = '{}'\n")
+
+
+
+
+
+
 				else:
 					writef.write(line)
+	exit()	### DEBUG ###
 	PyInstaller.__main__.run([
 		'--distpath', zmidir.as_posix(),
 		'--icon', icon.as_posix(),

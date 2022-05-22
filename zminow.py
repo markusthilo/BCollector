@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.1_2021-12-27'
+__version__ = '0.1_2022-05-20'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -18,11 +18,12 @@ from pathlib import Path
 class Main(Tk):
 	'Main window'
 
-	PATH_TO_TRIGGERFILE
+	TRIGGERFILE = 'zminow.trigger'
 
 	def __init__(self, icon_base64):
 		'Define the main window'
 		super().__init__()
+		self.triggerpath = Path(self.TRIGGERFILE)
 		self.title('SQLDump2Xlsx')
 		self.resizable(0, 0)
 		self.iconphoto(False, PhotoImage(data = icon_base64))
@@ -33,7 +34,7 @@ class Main(Tk):
 
 	def importnow(self):
 		'Generate trigger file'
-		with open(self.PATH_TO_TRIGGERFILE, 'w') as f:
+		with open(self.triggerpath, 'w') as f:
 			f.write(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 		showinfo(title='ZMIport', message='Import is triggered')
 		self.destroy()
