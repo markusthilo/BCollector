@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.2_2022-05-09'
+__version__ = '0.2_2022-05-23'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -51,12 +51,13 @@ class Config:
 	def __init__(self, configfile):
 		'Get configuration from file and initiate logging'
 		if configfile == None:
-			configfile = Path((__file__).parent / 'zmimport.conf'
+			configfile = Path(__file__).parent / 'zmimport.conf'
 		config = ConfigParser()
 		config.read(configfile)
 		self.loglevel = config['LOGGING']['level']
 		self.logfile = Path(config['LOGGING']['filepath'])
 		self.csvpath = Path(config['FILELIST']['filepath'])
+		self.fieldnames = [ fn.strip(' ') for fn in  config['FILELIST']['fieldnames'].split(',') ]
 		self.pgp_cmd = Path(config['PGP']['command'])
 		self.pgp_passphrase = config['PGP']['passphrase']
 		self.triggerfile = Path(config['TRIGGER']['filepath'])
@@ -233,32 +234,31 @@ class Source(FileOperations, HttpFileTransfer):
 class Backup(FileOperations):
 	'Backup to keep the files'
 
-	def __init__(self, dirpath, csvpath):
+	def __init__(self, config):
 		'Create object for work on the backup server'
-		super().__init__(dirpath)
-		self.csvpath = csvpath
+		super().__init__(config.backuppath)
+		self.csvpath = config.csvpath
+		self.fieldnames = config.fieldnames
 		self.fetched = set()	# already fetched from source
 		self.putted = set()	# already putted to target
-		self.fieldnames = ('filename_orig', 'sum_orig', 'ts_fetch', 'filename_dec', 'sum_dec')
-		if csvpath.exists():	# check if filelist exists and has matching fieldnames
-			with open(csvpath, 'r') as f:
-				reader = DictReader(f, fieldnames=self.fieldnames)
-				fieldnames = tuple(next(reader).values())	# read headline
+		if self.csvpath.exists():	# check if filelist exists and has matching fieldnames
+			with open(self.csvpath, 'r') as f:
+				reader = DictReader(f)
 				logging.debug(
-					f'{csvpath} stores the following fields: '
-					+ str(fieldnames).lstrip('(').rstrip(')')
+					f'{self.csvpath} stores the following fields: '
+					+ str(reader.fieldnames).lstrip('(').rstrip(')')
 				)
-				if fieldnames != self.fieldnames:	# check for wrong csv file format
+				if self.fieldnames != reader.fieldnames:	# check for wrong csv file format
 					logging.error(
 						f'{csvpath} contains mismatching fieldnames: '
-						+ str(fieldnames).lstrip('(').rstrip(')')
+						+ str(reader.fieldnames).lstrip('(').rstrip(')')
 					)
 					raise RuntimeError('Mismatching fieldnames in CSV file')
 				for row in reader:	# get the already handled files from csv file
 					self.fetched.add(row['filename_orig'])
 					self.putted.add(row['filename_dec'])
 		else:	# creste csv file if not existend
-			with open(csvpath, 'w', newline='') as f:
+			with open(self.csvpath, 'w', newline='') as f:
 				writer = SequenceWriter(f)
 				writer.writerow(self.fieldnames)
 
@@ -284,7 +284,7 @@ class Transfer:
 		logging.debug(f'File / transfer infos will be stored in {config.csvpath}')
 		source = Source(config)
 		logging.debug(f'Source is {source.path}')
-		backup = Backup(config.backuppath, config.csvpath)
+		backup = Backup(config)
 		logging.debug(f'Backup is {backup.path}')
 		for path, pattern in config.targets.items():
 			logging.debug(f'Target is {path} for regex pattern "{pattern}"')
