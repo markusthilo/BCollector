@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.2_2022-05-23'
+__version__ = '0.2_2022-06-22'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -48,10 +48,8 @@ class Logger:
 class Config:
 	'Handle the config file'
 
-	def __init__(self, configfile):
+	def __init__(self, configfile=Path(__file__).parent / 'zmimport.conf'):
 		'Get configuration from file and initiate logging'
-		if configfile == None:
-			configfile = Path(__file__).parent / 'zmimport.conf'
 		config = ConfigParser()
 		config.read(configfile)
 		self.loglevel = config['LOGGING']['level']
@@ -353,11 +351,12 @@ class MainLoop:
 
 if __name__ == '__main__':	# start here if called as application
 	argparser = ArgumentParser(description=__description__)
-	argparser.add_argument('-c', '--config', type=FileType('rt', encoding='utf8'),
-		help='Config file', metavar='FILE'
+	argparser.add_argument('-c', '--config', type=Path,
+		help='Config file', metavar='FILE',
+		default=Path(__file__).parent / 'zmimport.conf'
 	)
 	args = argparser.parse_args()
-	config = Config(args.config)
+	config = Config(configfile=args.config)
 	log = Logger(config.loglevel, config.logfile)
 	if logging.root.level == logging.DEBUG:
 		logging.info('Starting file transfer on debug level now and for once')
