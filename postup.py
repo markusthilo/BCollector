@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.1_2022-05-25'
+__version__ = '0.2_2022-07-15'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -14,6 +14,7 @@ from tkinter.filedialog import askopenfilename
 from tkinter.messagebox import showerror
 from tkinter.scrolledtext import ScrolledText
 from pathlib import Path
+from shutil import copy2 as copy
 from csv import DictReader
 
 class CsvFile:
@@ -50,8 +51,9 @@ class Worker(CsvFile):
 		for caseno, dstdep in self.readall():
 			try:
 				srcpath = Path(caseno.join(self.srcfile))
-				dstpath = self.dstparentpath / dstdep / srcpath.name
-				srcpath.rename(dstpath)
+				dstpath = self.dstparentpath / dstdep
+				copy(srcpath, dstpath)	# rename does not adapt permissions on windows
+				srcpath.unlink()
 				yield str(f'{caseno}, {dstdep}: moved {srcpath} to {dstpath}')
 			except Exception as ex:
 				yield(repr(ex))
