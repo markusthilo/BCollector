@@ -2,27 +2,19 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.1_2024-11-28'
+__version__ = '0.1_2024-11-30'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
 __description__ = 'Fetch gpg encrypted files, save them on backup and export to target'
 
 import logging
-from os import remove
 from shutil import copy2 as copyfile
 from pathlib import Path
-from lxml.html import parse as parse_html
-from urllib.request import urlopen
-from hashlib import sha256
 from sys import exit as sysexit
-from re import match
-from subprocess import Popen, PIPE, STDOUT
 from time import sleep
 from datetime import datetime
 from configparser import ConfigParser
-from csv import DictReader, DictWriter
-from csv import writer as SequenceWriter
 from argparse import ArgumentParser, FileType
 ### Custom Libraries ###
 from lib.logger import Logger
@@ -30,204 +22,101 @@ from lib.httpdownloader import HttpDownloader
 from lib.pgpdecoder import PgpDecoder
 
 class Config:
-	'Handle the config file'
+	'Get configuration from file'
 
 	def __init__(self, path):
 		'Get configuration from file and initiate logging'
 		config = ConfigParser()
 		config.read(path)
-		self.logdir = Path(config['DIRS']['log'])
-		self.csvpath = Path(config['FILELIST']['filepath'])
-		self.fieldnames = [ fn.strip(' ') for fn in  config['FILELIST']['fieldnames'].split(',') ]
+		self.sources = {
+			section: {
+				'url':		config[section]['url'],
+				'xpath':	config[section]['xpath'],
+				'time':		[t.strip(' ') for t in config[section]['time'].split(',')],
+				'target':	Path(config[section]['target']),
+				'backup':	Path(config[section]['backup']),
+			} for section in config.sections() if section.startswith('SOURCE')
+		}
+		self.retries = int(config['GENERAL']['retries'])
+		self.retrydelay = int(config['GENERAL']['delay'])
+		self.sleep = int(config['GENERAL']['sleep'])
+		self.keep = int(config['GENERAL']['keep']) * 2629746	# time delta in seconds to keep files
 		self.pgp_cmd = Path(config['PGP']['command'])
 		self.pgp_passphrase = config['PGP']['passphrase']
-		self.triggerfile = Path(config['TRIGGER']['filepath'])
-		self.updates = [ t.strip(' ') for t in config['TRIGGER']['time'].split(',') ]
-		self.sleep = int(config['TRIGGER']['sleep'])
-		if self.sleep < 60:	# or there will be several polls in one minute
-			self.sleep = 60
-		self.sourcetype = config['SOURCE']['type'].lower()
-		self.sourcepath = Path(config['SOURCE']['path'])
-		if self.sourcetype == 'url':
-			self.sourcepath = config['SOURCE']['path']
-			if self.sourcepath[-1] != '/':
-				self.sourcepath += '/'
-			self.xpath = config['SOURCE']['xpath']
-			self.retries = int(config['SOURCE']['retries'])
-			self.retrydelay = int(config['SOURCE']['delay'])
-		else:
-			self.sourcepath = Path(config['SOURCE']['path'])
-			self.xpath = ''
-		self.backuppath = Path(config['BACKUP']['path'])
-		self.targets = dict()
-		for section in config.sections():
-			if section[:6] == 'TARGET':
-				if section == 'TARGET':
-					self.targetpath = Path(config['TARGET']['path'])
-				else:
-					self.targets[Path(config[section]['path'])] = config[section]['pattern']
+		self.logdir = Path(config['LOG']['dir'])
 
+	def time_match(self, hhmm):
+		'''Check if it is time, return list of sources'''
+		return [source for source in self.sources if hhmm in self.sources[source]['time']]
 
-class Backup(FileOperations):
-	'Backup to keep the files'
+class Backup:
+	'''Handle the backup of the files'''
 
 	def __init__(self, config):
-		'Create object for work on the backup server'
-		super().__init__(config.backuppath)
-		self.csvpath = config.csvpath
-		self.fieldnames = config.fieldnames
-		self.fetched = set()	# already fetched from source
-		self.putted = set()	# already putted to target
-		if self.csvpath.exists():	# check if filelist exists and has matching fieldnames
-			with open(self.csvpath, 'r') as f:
-				reader = DictReader(f)
-				logging.debug(
-					f'{self.csvpath} stores the following fields: '
-					+ str(reader.fieldnames).lstrip('(').rstrip(')')
-				)
-				if self.fieldnames != reader.fieldnames:	# check for wrong csv file format
-					logging.error(
-						f'{csvpath} contains mismatching fieldnames: '
-						+ str(reader.fieldnames).lstrip('(').rstrip(')')
-					)
-					raise RuntimeError('Mismatching fieldnames in CSV file')
-				for row in reader:	# get the already handled files from csv file
-					self.fetched.add(row['filename_orig'])
-					self.putted.add(row['filename_dec'])
-		else:	# creste csv file if not existend
-			with open(self.csvpath, 'w', newline='') as f:
-				writer = SequenceWriter(f)
-				writer.writerow(self.fieldnames)
+		'''Create object for the backup directory'''
+		self.config = config
 
-	def remove(self, filename):
-		'Remove file from backup'
-		filepath = self.fullpath(filename)
-		self.rm(filepath)
-		logging.debug(f'Removed {filepath}')
+	def ls(self, source):
+		'''List files in backup directory'''
+		return (path for path in self.config.sources[source]['backup'].glob('*') if path.is_file())
 
-	def update_csv(self, newfiles):
-		with open(self.csvpath, 'a', newline='') as f:	# open csv file to append new files / transfers
-			writer = DictWriter(f, self.fieldnames)
-			for row in newfiles:
-				writer.writerow(row)
-		logging.info(f'Updated {self.csvpath}')
+	def get_expired(self, source):
+		'''Get the files that were created before given time delta'''
+		oldest = datetime.timestamp(datetime.now()) - self.config.keep
+		return (path for path in self.ls(source) if path.stat().st_mtime < oldest)
+
+	def purge(self):
+		'''Delete all files in backup directory that are expired'''
+		for source in self.config.sources:
+			for path in self.get_expired(source):
+				try:
+					path.unlink()
+				except Exception as e:
+					logging.error(f'Unable to remove expired file {path}:\n{e}')
+				else:
+					logging.info(f'Removed expired file {path}')
 
 class Collector:
 	'Functionality to process the whole file transfer'
 
 	def __init__(self, config):
 		'File transfer'
-		decoder = PgpDecoder(config.pgp_cmd, config.pgp_passphrase)
+		self.config = config
+		self.backup = Backup(self.config)
+		self.decoder = PgpDecoder(self.config.pgp_cmd, self.config.pgp_passphrase)
 
-class Source(FileOperations, HttpFileTransfer):
-	'Source to import from'
-
-	def __init__(self, config):
-		self.path = config.sourcepath
-		self.sourcetype = config.sourcetype
-		if self.sourcetype == 'url':
-			self.xpath = config.xpath
-			self.retries = config.retries
-			self.delay = config.retrydelay
-
-	def listfiles(self):
-		'List files as set'
-		logging.debug('Getting source file list')
-		if self.sourcetype == 'url':
-			return set( fn for fn in super().basedir(retries=self.retries, delay=self.delay) if fn[-4:] == '.pgp' )
-		else:
-			return set( f for f in super().ls() if f.suffix == '.pgp' )
-
-	def fetch(self, sourcefile, dstpath):
-		'Copy one file to given path (backup server is intended)'
-		if self.sourcetype == 'url':
-			sourcepath, filepath, filesum = self.download(sourcefile, dstpath)
-		else:
-			sourcepath = self.fullpath(sourcefile)
-			filepath = dstpath / sourcefile
-			copyfile(sourcepath, dstpath)
-			sourcesum = self.sha256(sourcepath)
-			filesum = self.sha256(filepath)
-			logging.debug(
-				f'Copied {sourcepath} (checksum: {sourcesum}) to {filepath} (checksum: {filesum})'
-			)
-			if sourcesum != filesum:
-				remove(filepath)
-				logging.error(f'Could not download / copy {sourcepath} to {filepath}, removing {filepath}')
-				raise RuntimeError('Checksum mismatch on fetching file(s) from source')
-		return sourcepath, filepath, filesum, self.now()
-
-
-
-
-		logging.debug(f'File / transfer infos will be stored in {config.csvpath}')
-		source = Source(config)
-		logging.debug(f'Source is {source.path}')
-		backup = Backup(config)
-		logging.debug(f'Backup is {backup.path}')
-		for path, pattern in config.targets.items():
-			logging.debug(f'Target is {path} for regex pattern "{pattern}"')
-		logging.debug(f'Basic target is {config.targetpath}')
-		newonsource = source.listfiles() - backup.fetched	# filter for new files
-		if newonsource == set():
-			logging.info(f'Did not find new file(s) on {source.path}')
-			return
-		logging.info(
-			f'Found new file(s) on {source.path}: '
-			+ str(newonsource).lstrip('{').rstrip('}')
+	def run(self, source):
+		'''Run one collection'''
+		downloader = HttpDownloader(
+			self.config.sources[source]['url'],
+			self.config.sources[source]['xpath']
 		)
-		fetches = list()	# to store the fetched files
-		for sourcefile in newonsource:
-			sourcepath, backuppath, sum_orig, ts_fetch = source.fetch(sourcefile, backup.path)
-			logging.info(f'Copied {sourcepath} to {backuppath}')
-			fetches.append((Path(sourcefile).name, sum_orig, ts_fetch))
-		decoded = list()	# to store the decoded files
-		for filename_orig, sum_orig, ts_fetch in fetches:
-			backuppath = backup.path / filename_orig
-			targetdir = None	# select target directory
-			for path, pattern in config.targets.items():
-				if match(pattern, filename_orig) != None:
-					targetdir = path
-					break
-			if targetdir == None:
-				targetdir = config.targetpath
-			try:
-				decodedpath = decoder.decode(backuppath, targetdir)
-				logging.info(f'Decoded {backuppath} to {decodedpath}')
-			except RuntimeError:
-				backup.remove(backuppath)
-				continue
-			targetsum = backup.sha256(decodedpath)
-			decoded.append({
-				'filename_orig': filename_orig,
-				'sum_orig': sum_orig,
-				'ts_fetch': ts_fetch,
-				'filename_dec': decodedpath.name,
-				'sum_dec': targetsum
-			})
-		if decoded != list():
-			backup.update_csv(decoded)
+		new_files = set(downloader.ls()) - set(self.backup.ls(source))
+		print()	### DEBUG ###
+		print(new_files)
 
-class Worker:
+
+	def run_all(self):
+		'''Run collection from every server'''
+		for source in self.config.sources:
+			self.run(source)
+
+class Worker(Collector):
 	'''Do the work'''
-
-	def __init__(self, config):
-		'''Initiate main loop'''
-		self.collector = Collector(config)
-		self.sleep = config.sleep
-
-	def run(self)
-		'''Run one time for loglevel debug'''
-		self.collector.run()
 
 	def loop(self):
 		'''Endless loop for doemon mode'''
 		while True:
-			try:
-				self.collector.run()
-			except Exception as e:
-				logging.error(e)
-			sleep(self.sleep)
+			self.backup.purge()
+			sources_to_check = self.config.time_match(datetime.now().strftime('%H:%M'))
+			if not sources_to_check:
+				sleep(self.config.sleep)
+				continue
+			for source in sources_to_check:
+				try:
+					self.collector.run(source)
+				except Exception as e:
+					logging.error(f'Something went wrong in worker loop:\n{e}')
 
 if __name__ == '__main__':	# start here if called as application
 	this_script_path = Path(__file__)
@@ -236,22 +125,22 @@ if __name__ == '__main__':	# start here if called as application
 		type = Path,
 		help = 'Config file',
 		metavar = 'FILE',
-		default = this_script_path.with_suffix('conf')
+		default = this_script_path.with_suffix('.conf')
 	)
 	argparser.add_argument('-l', '--loglevel',
 		type = str,
 		help = 'Log level',
 		metavar = 'STRING',
-		choices= ['debug', 'info', 'warning', 'error', 'critical']
-		default = 'info'
+		choices= ['debug', 'info', 'warning', 'error', 'critical'],
+		default = 'debug' #'info'
 	)
 	args = argparser.parse_args()
 	config = Config(args.config)
 	Logger(level=args.loglevel, dir=config.logdir)
 	worker = Worker(config)
 	if logging.root.level == logging.DEBUG:
-		logging.info('Starting download on debug level now and for once')
-		worker.run()
+		logging.debug('Starting download on debug level now and for once')
+		worker.run_all()
 		sysexit(0)
 	else:
 		logging.info('Starting main loop')
