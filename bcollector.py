@@ -9,7 +9,6 @@ __status__ = 'Testing'
 __description__ = 'Fetch gpg encrypted files, save them on backup and export to target'
 
 import logging
-from shutil import copy2 as copyfile
 from pathlib import Path
 from sys import exit as sysexit
 from time import sleep
@@ -22,17 +21,18 @@ from lib.httpdownloader import HttpDownloader
 from lib.pgpdecoder import PgpDecoder
 
 class Config:
-	'Get configuration from file'
+	'''Configuration file'''
 
 	def __init__(self, path):
-		'Get configuration from file and initiate logging'
+		'''Get configuration from file'''
+		self.path = path
 		config = ConfigParser()
-		config.read(path)
+		config.read(self.path)
 		self.sources = {
 			section: {
 				'url':		config[section]['url'],
 				'xpath':	config[section]['xpath'],
-				'time':		[t.strip(' ') for t in config[section]['time'].split(',')],
+				'minutes':	[int(minute.strip(' ')) for minute in config[section]['minutes'].split(',')],
 				'target':	Path(config[section]['target']),
 				'backup':	Path(config[section]['backup']),
 			} for section in config.sections() if section.startswith('SOURCE')
@@ -45,12 +45,8 @@ class Config:
 		self.pgp_passphrase = config['PGP']['passphrase']
 		self.logdir = Path(config['LOG']['dir'])
 
-	def time_match(self, hhmm):
-		'''Check if it is time, return list of sources'''
-		return [source for source in self.sources if hhmm in self.sources[source]['time']]
-
 class Backup:
-	'''Handle the backup of the files'''
+	'''Handle the backup'''
 
 	def __init__(self, config):
 		'''Create object for the backup directory'''
@@ -77,7 +73,7 @@ class Backup:
 					logging.info(f'Removed expired file {path}')
 
 class Collector:
-	'Functionality to process the whole file transfer'
+	'''Functionality to process the whole file transfer'''
 
 	def __init__(self, config):
 		'File transfer'
@@ -91,10 +87,12 @@ class Collector:
 			self.config.sources[source]['url'],
 			self.config.sources[source]['xpath']
 		)
-		new_files = set(downloader.ls()) - set(self.backup.ls(source))
-		print()	### DEBUG ###
-		print(new_files)
-
+		for filename in set(downloader.ls()) - {path.name for path in self.backup.ls(source)}:
+			backup_path = downloader.download(filename, config.sources[source]['backup'])
+			if backup_path:
+				decrypted_path = self.decoder.decode(encrypted_path, dir_path)
+				if decrypted_path:
+					logging.info(f'Download process generated {decrypted_path} and {backup_path}')
 
 	def run_all(self):
 		'''Run collection from every server'''
@@ -108,15 +106,14 @@ class Worker(Collector):
 		'''Endless loop for doemon mode'''
 		while True:
 			self.backup.purge()
-			sources_to_check = self.config.time_match(datetime.now().strftime('%H:%M'))
-			if not sources_to_check:
-				sleep(self.config.sleep)
-				continue
-			for source in sources_to_check:
-				try:
-					self.collector.run(source)
-				except Exception as e:
-					logging.error(f'Something went wrong in worker loop:\n{e}')
+			this_minute = int(datetime.now().strftime('%M'))
+			for source in self.config.sources:
+				if this_minute in self.config.sources[source]['minutes']:
+					try:
+						self.collector.run(source)
+					except Exception as e:
+						logging.error(f'Something went wrong in mail loop while checking {source}:\n{e}')
+			sleep(self.config.sleep)
 
 if __name__ == '__main__':	# start here if called as application
 	this_script_path = Path(__file__)
@@ -132,7 +129,7 @@ if __name__ == '__main__':	# start here if called as application
 		help = 'Log level',
 		metavar = 'STRING',
 		choices= ['debug', 'info', 'warning', 'error', 'critical'],
-		default = 'debug' #'info'
+		default = 'info'
 	)
 	args = argparser.parse_args()
 	config = Config(args.config)
@@ -141,6 +138,7 @@ if __name__ == '__main__':	# start here if called as application
 	if logging.root.level == logging.DEBUG:
 		logging.debug('Starting download on debug level now and for once')
 		worker.run_all()
+		print(config.path.read_text(encoding='utf-8'))
 		sysexit(0)
 	else:
 		logging.info('Starting main loop')
