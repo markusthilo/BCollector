@@ -12,25 +12,22 @@ class PgpDecoder:
 		self.cmd = cmd
 		self.passphrase = passphrase
 
-	def decode(self, encrypted_path, dir_path):
+	def decode(self, encrypted_path, decrypted_path):
 		'Decode pgp file and return generated file'
-		decrypted_path = dir_path / encrypted_path.stem
 		pcmd = (
 				self.cmd,
+				'--yes',
 				'--pinentry-mode=loopback',
 				'--passphrase', self.passphrase,
 				'--output', f'{decrypted_path}',
 				'--decrypt', f'{encrypted_path}'
 		)
-		logging.debug(f'Now executing: {pcmd}')
-		process = Popen(pcmd, stdout=PIPE, stderr=STDOUT)
-		while process.poll() is None:
-			while True:
-				err = process.stdout.readline().decode().strip()
-				if err:
-					logging.error(err)
-				else:
-					break
+		process = Popen(pcmd, stdout=PIPE, stderr=STDOUT, universal_newlines=True, text=True, encoding='utf-8')
+		stdout, stderr = process.communicate()
+		msg = stdout
+		if stderr:
+			msg += f'\n{stderr}'
 		if process.returncode == 0:
+			logging.debug(f'PGP: {msg}')
 			return decrypted_path
-		logging.error(f'Could not decrypt {encrypted_path} to {decrypted_path}')
+		logging.error(f'Could not decrypt {encrypted_path} to {decrypted_path}: {msg}')
