@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.2.0_2025-02-26'
+__version__ = '0.2.0_2025-03-06'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -102,12 +102,12 @@ class Collector:
 				try:
 					dir_path = self.target_dir_path / f'{pts[0]}_{pts[1]}_{pts[2]}/{pts[0]}{pts[2][2:].replace("-", "")}'
 					file_path = dir_path / filename[:-4]
-					if file_path.exists():
-						raise FileExistsError(f'{file_path} is already present')
 					dir_path.mkdir(parents=True, exist_ok=True)
 					encrypted_path = downloader.download(filename)
 					if not encrypted_path:
 						raise TimeoutError(f'Unable to download {filename}')
+					if file_path.exists():
+						raise FileExistsError(f'{file_path} is already present')
 					decrypted_path = self.decoder.decode(encrypted_path, file_path)
 					if not decrypted_path:
 						raise RuntimeError(f'Unable to decode {encrypted_path}')

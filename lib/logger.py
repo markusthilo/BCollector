@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 from zipfile import ZipFile, ZIP_DEFLATED
+from time import sleep as t_sleep
 
 class Logger:
 	'Advanced logging functionality'
@@ -37,7 +38,11 @@ class Logger:
 			zip_name = self.stem + datetime.now().strftime('_%Y-%m-%d_%H%M%S.zip')
 			with ZipFile(self.dir / zip_name, 'w', ZIP_DEFLATED) as zf:
 				zf.write(self.path, self.path.name)
-			self.path.unlink()
+			try:	# got a permission error 07.04.2024
+				self.path.unlink()
+			except:	# so try with this
+				t_sleep(10)
+				self.path.unlink()
 		elif self.path.exists():
 			raise RuntimeError(f'Unable to create log file {self.path}')
 		logging.basicConfig(
