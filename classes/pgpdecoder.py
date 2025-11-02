@@ -9,20 +9,26 @@ class PgpDecoder:
 
 	def __init__(self, cmd, passphrase):
 		'Create decoder by giving the command line'
-		self.cmd = cmd
-		self.passphrase = passphrase
+		self._cmd = cmd
+		self._passphrase = passphrase
 
 	def decode(self, encrypted_path, decrypted_path):
 		'Decode pgp file and return generated file'
 		pcmd = (
-				self.cmd,
+				self._cmd,
 				'--yes',
 				'--pinentry-mode=loopback',
-				'--passphrase', self.passphrase,
+				'--passphrase', self._passphrase,
 				'--output', f'{decrypted_path}',
 				'--decrypt', f'{encrypted_path}'
 		)
-		process = Popen(pcmd, stdout=PIPE, stderr=STDOUT, universal_newlines=True, text=True, encoding='utf-8')
+		process = Popen(pcmd,
+			stdout = PIPE,
+			stderr = STDOUT,
+			universal_newlines = True,
+			text = True,
+			encoding = 'utf-8'
+		)
 		stdout, stderr = process.communicate()
 		msg = stdout
 		if stderr:
