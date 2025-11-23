@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import logging
-from traceback import format_exc
-from sys import stdout, exit
+from traceback import format_tb, format_exc
+from sys import stdout, exc_info, exit
 from datetime import datetime
 from zipfile import ZipFile, ZIP_DEFLATED
 
@@ -20,19 +20,21 @@ class Logger:
 		return logging.root.level
 
 	@staticmethod
-	def exception(level, message=None, exception=None, traceback=False):
+	def debugging():
+		'''Return True if root log level is DEBUG or lower'''
+		return Logger.get_level() <= logging.DEBUG
+
+	@staticmethod
+	def exception(level, message=None):
 		'''Log exception'''
-		msg = ''
-		if message:
-			msg += f'{message}'
-		if exception:
-			msg += f', {type(exception).__name__}: {exception}'
-		if traceback:
-			exc = format_exc()
-			print('################', exc)
-			if exc:
-				msg += f'\n{format_exc().strip()}'
-		logging.__dict__[level.lower()](msg.lstrip(', '))
+		ex_type, ex_text, traceback = exc_info()
+		if ex_type:
+			msg = f'{message}, {ex_type.__name__}: {ex_text}' if message else f'{ex_type.__name__}: {ex_text}'
+		else:
+			msg = message if message else ''
+		if Logger.debugging() and traceback:
+			msg += f'\n{format_exc().strip()}'
+		logging.__dict__[level.lower()](msg)
 
 	@staticmethod
 	def debug(msg):
@@ -45,27 +47,19 @@ class Logger:
 		logging.info(msg)
 
 	@staticmethod
-	def warning(message=None, exception=None):
+	def warning(message=None):
 		'''Log warning'''
-		Logger.exception('warning',
-			message = message,
-			exception = exception,
-			traceback = logging.root.level <= logging.DEBUG
-		)
+		Logger.exception('warning', message=message)
 
 	@staticmethod
 	def error(message=None, exception=None):
 		'''Log error'''
-		Logger.exception('error',
-			message = message,
-			exception = exception,
-			traceback = logging.root.level <= logging.DEBUG
-		)
+		Logger.exception('error', message = message)
 
 	@ staticmethod
 	def critical(message=None, exception=None):
 		'''Log critical error'''
-		Logger.exception('critical', message=message, traceback=True)
+		Logger.exception('critical', message=message)
 		exit(1)
 
 	def __init__(self, level='debug'):

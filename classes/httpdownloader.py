@@ -2,52 +2,57 @@
 # -*- coding: utf-8 -*-
 
 from requests import get as get_http
-from bs4 import BeautifulSoup
-from urllib.request import urlretrieve
 from time import sleep
+from bs4 import BeautifulSoup
+from re import match as re_match
+from urllib.request import urlretrieve
+
 from classes.logger import Logger as Log
 
 class HTTPDownloader:
 	'Tools to fetch files via HTTP'
 
-	def __init__(self, base_url, retries=10, delay=2):
-		'Initialize object'
-		self._base_url = base_url.rstrip('/')
+	def __init__(self, url, retries=10, delay=2):
+		'''Initialize object'''
+		self._url = url.rstrip('/')
 		self._retries = retries
 		self._delay = delay
 
-	def ls(self, sub=''):
-		'List source files'
-		url = self._base_url+sub
+	def ls(self, match=None):
+		'''List remote directory / links in site'''
 		for attempt in range(1, self._retries+1):
 			try:
-				soup = BeautifulSoup(get_http(url).text, 'html.parser')
+				soup = BeautifulSoup(get_http(self._url).text, 'html.parser')
 				break
 			except:
 				if attempt < self._retries:
-					Log.debug(f'Attempt {attempt} to retrieve file list from {url} failed, retrying in {self._delay} seconds')
+					Log.debug(f'Attempt {attempt} to retrieve file list from {self._url} failed, retrying in {self._delay} seconds')
 					sleep(self._delay)
 				else:
-					logging.error(f'Unable to retrieve file list from {url}.')
+					Log.error(f'Unable to retrieve file list from {self._url}.')
 					return
-		return [link.get('href') for link in soup.find_all('a')]
-
-	def download(self, filename):
-		'Download given file'
-		source = self._url + filename
-		dst_file_path = self._download_path / filename
-		for at in range(1, self._retries+1):
-			logging.debug(f'Attempt {at} downloading {source} to {self._download_path}')
-			if logging.root.level == logging.DEBUG:
-				print(f'DEBUG: Starting download of {source} to {dst_file_path}')
-			try:
-				urlretrieve(source, dst_file_path)
-			except Exception as e:
-				logging.error(f'Attempt {at} of {self._retries} to retrieve {source} failed:\n{e}')
-				sleep(self._delay)
+		for link in soup.find_all('a'):
+			href = link.get('href')
+			if match:
+				if re_match(match, href):
+					yield href
 			else:
-				logging.info(f'Received file {source} on attempt {at}')
-				if logging.root.level == logging.DEBUG:
-					print(f'DEBUG: Finished download of {source} to {dst_file_path}')
-				return dst_file_path
-		logging.error(f'Unable to download {source}')
+				yield href
+
+	def download(self, filename, local_dir_path):
+		'''Download file'''
+		local_path = local_dir_path / filename
+		url = self._url + filename
+		Log.debug(f'Downloading {url} to {local_path}')
+		for attempt in range(1, self._retries+1):
+			try:
+				urlretrieve(url, local_path)
+				return local_path
+			except:
+				if attempt < self._retries:
+					Log.debug(f'Attempt {attempt} to download file {url} failed, retrying in {self._delay} seconds')
+					sleep(self._delay)
+				else:
+					Log.error(f'Unable to download {url}')
+					return
+

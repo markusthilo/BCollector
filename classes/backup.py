@@ -1,38 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import logging
 from datetime import datetime
+from classes.logger import Logger as Log
 
 class Backup:
 	'''Handle the backup'''
 
-	def __init__(self, path, keep):
+	def __init__(self, path):
 		'''Create object for the backup directory'''
 		self._path= path
-		self._keep = keep
 
-	def ls(self):
-		'''List files in backup directory'''
-		return (path for path in self.path.glob('*.zip.pgp'))
+	def ls(self, pattern='*'):
+		'''Get files in backup directory'''
+		return (path for path in self.path.glob(pattern))
 
-	def get_expired(self):
+	def get_expired(self, keep):
 		'''Get the files that were created before given time delta'''
-		oldest = datetime.timestamp(datetime.now()) - self._keep
+		oldest = datetime.timestamp(datetime.now()) - keep
 		return (path for path in self.ls() if path.stat().st_mtime < oldest)
 
-	def purge(self):
+	def purge(self, keep):
 		'''Delete all files in backup directory that are expired'''
-		for path in self.get_expired():
+		for path in self.get_expired(keep):
 			try:
 				path.unlink()
 			except Exception as e:
-				msg = f'Unable to remove expired file {path}:\n{e}'
-				logging.error(msg)
-				msg = f'ERROR: {msg}'
+				Log.error(f'Unable to remove expired file {path}')
 			else:
-				msg = f'Removed expired file {path}'
-				logging.info(msg)
-				msg = f'INFO: {msg}'
-			if logging.root.level == logging.DEBUG:
-				print(msg)
+				Log.info(f'Removed expired file {path}')
