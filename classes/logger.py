@@ -62,7 +62,7 @@ class Logger:
 		Logger.exception('critical', message=message)
 		exit(1)
 
-	def __init__(self, level='debug'):
+	def __init__(self, level='info'):
 		'''Define logging by given level and to given file'''
 		self.level = self.translate(level)
 		self._logger = logging.getLogger()
@@ -73,22 +73,22 @@ class Logger:
 		self._file_formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 		self.path = None
 	
-	def add_file(self, path):
+	def add_file(self, path, max_size=0):
 		'''Create logfile and zip old if exists'''
-		self.rotate()
 		if path.is_file():
 			with ZipFile(path.with_suffix(datetime.now().strftime('.%Y-%m-%d_%H%M%S.zip')), 'w', ZIP_DEFLATED) as zf:
 				zf.write(path, path.name)
 		elif path.exists():
 			raise FileExistsError(f'{path} is not a file')
 		self.path = path
+		self._max_size = max_size
 		self._file_handler = logging.FileHandler(mode='w', filename=self.path)
 		self._file_handler.setFormatter(self._file_formatter)
 		self._logger.addHandler(self._file_handler)
 		self.debug(f'Start logging to {self.path}')
 
-	def rotate(self):
-		'''Rotate and backup old logfile as zip'''
-		if self.path:
+	def check_size(self):
+		'''Zip old and create new log file if given file size is exceeded'''
+		if self._max_size and self.path.stat().st_size > self._max_size:
 			self._file_handler.close()
 			self.add_file(self.path)

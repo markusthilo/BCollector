@@ -12,13 +12,14 @@ from classes.logger import Logger as Log
 class HTTPDownloader:
 	'Tools to fetch files via HTTP'
 
-	def __init__(self, url, retries=10, delay=2):
+	def __init__(self, url, match=None, retries=None, delay=None):
 		'''Initialize object'''
 		self._url = url.rstrip('/')
-		self._retries = retries
-		self._delay = delay
+		self._match = match
+		self._retries = retries if retries else 10
+		self._delay = delay if delay else 2
 
-	def ls(self, match=None):
+	def ls(self):
 		'''List remote directory / links in site'''
 		for attempt in range(1, self._retries+1):
 			try:
@@ -33,8 +34,8 @@ class HTTPDownloader:
 					return
 		for link in soup.find_all('a'):
 			href = link.get('href')
-			if match:
-				if re_match(match, href):
+			if self._match:
+				if re_match(self._match, href):
 					yield href
 			else:
 				yield href
@@ -42,7 +43,7 @@ class HTTPDownloader:
 	def download(self, filename, local_dir_path):
 		'''Download file'''
 		local_path = local_dir_path / filename
-		url = self._url + filename
+		url = f'{self._url}/{filename}'
 		Log.debug(f'Downloading {url} to {local_path}')
 		for attempt in range(1, self._retries+1):
 			try:
