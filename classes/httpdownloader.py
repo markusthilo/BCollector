@@ -2,29 +2,35 @@
 # -*- coding: utf-8 -*-
 
 from urllib.request import urlopen, urlretrieve
-from bs4 import BeautifulSoup
 from time import sleep
 from re import match as re_match
-
-
+from html.parser import HTMLParser
 from classes.logger import Logger as Log
 
-class HTTPDownloader:
+class HTTPDownloader(HTMLParser):
 	'Tools to fetch files via HTTP'
 
 	def __init__(self, url, match=None, retries=None, delay=None):
 		'''Initialize object'''
+		super().__init__()
 		self._url = url.rstrip('/')
 		self._match = match
 		self._retries = retries if retries else 10
 		self._delay = delay if delay else 2
+		self._hrefs = list()
+
+	def handle_starttag(self, tag, attrs):
+		if tag == 'a':
+			for attr, value in attrs:
+				if attr == 'href' and ( not self._match or re_match(self._match, value) ):
+					self._hrefs.append(value)
 
 	def ls(self):
 		'''List remote directory / links in site'''
 		for attempt in range(1, self._retries+1):
 			try:
 				with urlopen(self._url) as response:
-					soup = BeautifulSoup(response.read(), 'html.parser')
+					html = response.read().decode('utf-8')
 			except:
 				if attempt < self._retries:
 					Log.debug(f'Attempt {attempt} to retrieve file list from {self._url} failed, retrying in {self._delay} seconds')
@@ -34,13 +40,8 @@ class HTTPDownloader:
 					return
 			else:
 				break
-		for link in soup.find_all('a'):
-			href = link.get('href')
-			if self._match:
-				if re_match(self._match, href):
-					yield href
-			else:
-				yield href
+		self.feed(html)
+		return self._hrefs
 
 	def download(self, filename, local_dir_path):
 		'''Download file'''
@@ -58,4 +59,3 @@ class HTTPDownloader:
 				else:
 					Log.error(f'Unable to download {url}')
 					return
-

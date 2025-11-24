@@ -32,7 +32,7 @@ class SFTPDownloader:
 			self._ssh.connect(hostname=host, port=port, username=user, password=pw, timeout=timeout)
 			self._sftp = self._ssh.open_sftp()
 		except Exception as ex:
-			Log.error(message=f'Unable to connect to {hostname}:{port} as {username}', exception=ex)
+			Log.error(message=f'Unable to connect to {host}:{port} as {user}', exception=ex)
 
 	def ls(self):
 		'''List remote directory'''
@@ -48,15 +48,11 @@ class SFTPDownloader:
 					return
 			else:
 				break
-		for item in dir:
-			if self._match:
-				if re_match(self._match, item):
-					yield item
-			else:
-				yield item
+		return [h for h in dir if not self._match or re_match(self._match, h)]
 
 	def download(self, filename, local_dir_path):
 		'''Download file'''
+		remote_path = f'{self._sub}{filename}'
 		local_path = local_dir_path / filename
 		Log.info(f'Downloading {remote_path} to {local_path}')
 		for attempt in range(1, self._retries + 1):
