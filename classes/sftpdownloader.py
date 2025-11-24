@@ -39,7 +39,6 @@ class SFTPDownloader:
 		for attempt in range(1, self._retries+1):
 			try:
 				dir = self._sftp.listdir(self._sub)
-				break
 			except:
 				if attempt < self._retries:
 					Log.debug(f'Attempt {attempt} to retrieve file list from {self._sub} failed, retrying in {self._delay} seconds')
@@ -47,6 +46,8 @@ class SFTPDownloader:
 				else:
 					Log.error(f'Unable to retrieve file list from {self._url}')
 					return
+			else:
+				break
 		for item in dir:
 			if self._match:
 				if re_match(self._match, item):

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from requests import get as get_http
-from time import sleep
+from urllib.request import urlopen, urlretrieve
 from bs4 import BeautifulSoup
+from time import sleep
 from re import match as re_match
-from urllib.request import urlretrieve
+
 
 from classes.logger import Logger as Log
 
@@ -23,8 +23,8 @@ class HTTPDownloader:
 		'''List remote directory / links in site'''
 		for attempt in range(1, self._retries+1):
 			try:
-				soup = BeautifulSoup(get_http(self._url).text, 'html.parser')
-				break
+				with urlopen(self._url) as response:
+					soup = BeautifulSoup(response.read(), 'html.parser')
 			except:
 				if attempt < self._retries:
 					Log.debug(f'Attempt {attempt} to retrieve file list from {self._url} failed, retrying in {self._delay} seconds')
@@ -32,6 +32,8 @@ class HTTPDownloader:
 				else:
 					Log.error(f'Unable to retrieve file list from {self._url}.')
 					return
+			else:
+				break
 		for link in soup.find_all('a'):
 			href = link.get('href')
 			if self._match:
