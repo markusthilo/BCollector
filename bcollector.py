@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.3.0_2025-11-24'
+__version__ = '0.3.0_2025-11-25'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -63,7 +63,7 @@ class BCollector:
 		Log.info(f'Starting main loop: delay = {delay}s, hours = {hours}, minutes = {minutes}, clean = {clean}h, keep = {keep} month(s)')
 		while True:
 			now = datetime.now()
-			if clean and clean == now.hour:
+			if clean and keep and clean == now.hour:
 				Log.info(f'Cleaning up download directory')
 				self._local.clean_download(keep_sec)
 			if ( not hours or now.hour in hours ) and ( not minutes or now.minute in minutes ):
@@ -73,12 +73,13 @@ class BCollector:
 			sleep(delay)
 
 if __name__ == '__main__':	# start here if called as application
+	default_config_path = Path(__file__).with_suffix('.conf')
 	argparser = ArgumentParser(description=__description__)
 	argparser.add_argument('-c', '--config',
 		type = Path,
-		help = 'Set path to config file',
+		help = f'Set path to config file (default: {default_config_path})',
 		metavar = 'FILE',
-		default = Path(__file__).with_suffix('.conf')
+		default = default_config_path
 	)
 	argparser.add_argument('-l', '--loglevel',
 		type = str,
