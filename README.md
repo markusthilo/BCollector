@@ -8,7 +8,7 @@
 ## Requirements
 Python 3.12 works fine. Newer versions should be no problem.
 
-In addition to the CPython standard libraries python-gnupg and paramiko are required:
+In addition to the standard libraries python-gnupg and paramiko are required:
 
 ```
 python -m pip install python-gnupg paramiko

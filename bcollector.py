@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.3.0_2025-11-25'
+__version__ = '0.4.0_2025-11-26'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -24,7 +24,6 @@ class BCollector:
 	'''Sync loacl with remote'''
 
 	def __init__(self, url, download_path, destination_path,
-		match = None,
 		password = None,
 		timeout = None,
 		retries = None,
@@ -36,25 +35,27 @@ class BCollector:
 		self._local = LocalDirs(download_path, destination_path, decryptor=decryptor)
 		protocol = self._url.split(':', 1)[0].lower()
 		if protocol == 'http':
-			self._downloader = HTTPDownloader(url, match=match, retries=retries, delay=delay)
+			self._downloader = HTTPDownloader(url, retries=retries, delay=delay)
 		elif protocol == 'sftp':
-			self._downloader = SFTPDownloader(url, password, match=match, timeout=timeout, retries=retries, delay=delay)
+			self._downloader = SFTPDownloader(url, password, timeout=timeout, retries=retries, delay=delay)
 		else:
 			raise ValueError(f'Unknown protocol {protocol}')
 
-	def download(self):
+	def find(self, name=None):
+		'''List remote files, regex filter filename'''
+		for path in self._downloader.find(name):
+			yield path
+
+	def download(self, name=None):
 		'''Download files'''
-		for filename in set(self._downloader.ls()) - set(self._local.ls_download()):
-			download_path = self._downloader.download(filename, self._local._download_path)
-			if download_path:
-				Log.info(f'Downloaded {download_path}')
-				try:
-					path = self._local.forward(filename)
-				except:
-					Log.error('Exception while forwarding {filename}')
-				else:
-					if path:
-						Log.info(f'Created {path}')
+		for relative_path in set(self._downloader.find(name=name)) - set(self._local.rglob_download()):
+			if not self._local.mk_download_dir(relative_path):
+				continue
+			download_file_path = self._downloader.download(relative_path, self._local._download_path)
+			if download_file_path:
+				Log.info(f'Downloaded {download_file_path}')
+				if destination_file_path := self._local.forward(download_file_path):
+					Log.info(f'Created {destination_file_path}')
 
 	def loop(self, logger, delay=None, hours=None, minutes=None, clean=None, keep=0):
 		'''Endless loop for daemon mode'''
@@ -88,8 +89,12 @@ if __name__ == '__main__':	# start here if called as application
 		choices= ['debug', 'info', 'warning', 'error', 'critical'],
 		default = 'debug'
 	)
+	argparser.add_argument('-s', '--simulate',
+		action = 'store_true',
+		help = 'Simulate: connect to server and list file, do not download any data',
+	)
 	args = argparser.parse_args()
-	logger = Log(args.loglevel)
+	logger = Log('debug') if args.simulate else Log(args.loglevel)
 	config_none = ('', 'none', 'no', 'false', '0')
 	try:
 		config = ConfigParser()
@@ -103,8 +108,8 @@ if __name__ == '__main__':	# start here if called as application
 		except:
 			Log.critical(f'Unable to create log file')
 		Log.debug(f'Logging to {log}')
-	match = config['REMOTE'].get('match', '')
-	match = match if not match.lower() in config_none else None
+	name = config['REMOTE'].get('name', '')
+	name = name if not name in ('', '.', '*', '.*') else None
 	encryption = config['REMOTE'].get('encryption')
 	if encryption:
 		encryption = encryption.lower()
@@ -123,7 +128,6 @@ if __name__ == '__main__':	# start here if called as application
 		config['REMOTE'].get('url'),
 		Path(config['LOCAL'].get('download')),
 		Path(config['LOCAL'].get('destination')),
-		match = match,
 		password = config['REMOTE'].get('password'),
 		timeout = config['REMOTE'].getint('timeout'),
 		retries = config['REMOTE'].getint('retries'),
@@ -131,8 +135,14 @@ if __name__ == '__main__':	# start here if called as application
 		decryptor = decryptor
 	)
 	if Log.debugging():
-		Log.info('Starting download on debug level now and for once')
-		collector.download()
+		if args.simulate:
+			Log.info('Starting fetching remote structure')
+			for path in collector.find(name=name):
+				Log.info(f'{path}')
+		else:
+			Log.info('Starting download on debug level now and for once')
+			collector.download(name=name)
+		Log.info('Done')
 		exit(0)
 	def parse(string):
 		if string.lower() in ('', 'all', 'every', 'each', '*', '.'):

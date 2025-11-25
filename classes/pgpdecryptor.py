@@ -12,6 +12,10 @@ class PGPDecryptor:
 		self._passphrase = passphrase
 		self._gpg = GPG()
 
+	def suffix_match(self, path):
+		'''Check if filename ends with .pgp or .gpg'''
+		return path.suffix.lower() in ('.pgp', '.gpg')
+
 	def decrypt(self, enc_file_path, dst_dir_path):
 		'''Write decrypted file'''
 		dst_file_path = dst_dir_path / enc_file_path.name.rstrip('.pgp').rstrip('.gpg')

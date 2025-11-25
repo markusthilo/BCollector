@@ -3,14 +3,14 @@
 
 from urllib.request import urlopen, urlretrieve
 from time import sleep
-from re import match as re_match
+from re import compile as re_compile
 from html.parser import HTMLParser
 from classes.logger import Logger as Log
 
 class HTTPDownloader(HTMLParser):
 	'Tools to fetch files via HTTP'
 
-	def __init__(self, url, match=None, retries=None, delay=None):
+	def __init__(self, url, retries=None, delay=None):
 		'''Initialize object'''
 		super().__init__()
 		self._url = url.rstrip('/')
@@ -18,15 +18,17 @@ class HTTPDownloader(HTMLParser):
 		self._retries = retries if retries else 10
 		self._delay = delay if delay else 2
 		self._hrefs = list()
+		self._regex = None
 
 	def handle_starttag(self, tag, attrs):
 		if tag == 'a':
 			for attr, value in attrs:
-				if attr == 'href' and ( not self._match or re_match(self._match, value) ):
+				if attr == 'href' and ( not self._regex or self._regex.match(value) ):
 					self._hrefs.append(value)
 
-	def ls(self):
+	def find(self, name=None):
 		'''List remote directory / links in site'''
+		self._regex = re_compile(name) if name else None
 		for attempt in range(1, self._retries+1):
 			try:
 				with urlopen(self._url) as response:
