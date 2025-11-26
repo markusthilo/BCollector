@@ -67,10 +67,10 @@ hours = every
 minutes = every
 # seconds that main loop is paused inbetween download attempts
 delay = 10
-# hour of the day to clean download directory
-clean = 23
 # months to keep files in download directory, 0 not to purge download directory
 keep = 3
+# hour of the day to clean download directory
+clean = 23
 ```
 
 ## Legal Notice

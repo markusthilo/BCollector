@@ -56,11 +56,13 @@ class BCollector:
 				Log.info(f'Downloaded {download_file_path}')
 				if destination_file_path := self._local.forward(download_file_path):
 					Log.info(f'Created {destination_file_path}')
+		else:
+			Log.info(f'No new files found')
 
 	def loop(self, logger, delay=None, hours=None, minutes=None, clean=None, keep=0):
 		'''Endless loop for daemon mode'''
 		delay = delay if delay else 10
-		keep_sec = keep * 2629746	# adjust time delta from months to seconds
+		keep_sec = keep * 2629746	# time delta from months to seconds
 		Log.info(f'Starting main loop: delay = {delay}s, hours = {hours}, minutes = {minutes}, clean = {clean}h, keep = {keep} month(s)')
 		while True:
 			now = datetime.now()
@@ -70,7 +72,10 @@ class BCollector:
 			if ( not hours or now.hour in hours ) and ( not minutes or now.minute in minutes ):
 				Log.info(f'Checking for new remote files')
 				self.download()
+			try:
 				logger.check_size()
+			except:
+				Log.error('Unable to check log file size')
 			sleep(delay)
 
 if __name__ == '__main__':	# start here if called as application
@@ -87,7 +92,7 @@ if __name__ == '__main__':	# start here if called as application
 		help = 'Log level: debug, info (default), warning, error or critical',
 		metavar = 'STRING',
 		choices= ['debug', 'info', 'warning', 'error', 'critical'],
-		default = 'debug'
+		default = 'info'
 	)
 	argparser.add_argument('-s', '--simulate',
 		action = 'store_true',

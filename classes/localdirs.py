@@ -21,14 +21,17 @@ class LocalDirs:
 	def clean_download(self, keep):
 		'''Delete all files in download directory that are expired'''
 		dirs = dict()
+		oldest = datetime.now().timestamp() - keep
 		for path in self._download_path.rglob('*'):
 			if path.is_dir():
-				dir[path] = len(path.parents)
+				dirs[path] = len(path.parents)
 			if path.is_file() and path.stat().st_mtime < oldest:	# remove expired file
 				try:
 					path.unlink()
 				except:
 					Log.error(f'Unable to remove expired file {path}')
+				else:
+					Log.info(f'Removed expired file {path}')
 		for path in sorted(dirs, key=dirs.get, reverse=True):	# remove empty directory
 			if not any(path.iterdir()):
 				try:
@@ -59,10 +62,13 @@ class LocalDirs:
 				Log.info(f'Decrypted {download_file_path} to {destination_file_path}')
 				return destination_file_path
 		try:
-			destination_file_path.write_bytes(download_file_path.read_bytes())
-			### this is for python  >= 3.14 ###
-			#return self._download_path.copy_into(self._destination_file_path)
+			if destination_file_path.exists():
+				Log.warning(f'File {destination_file_path} already exists, skipping copy attempt')
+				return
+			else:
+				destination_file_path.write_bytes(download_file_path.read_bytes())
+				return destination_file_path
+				### this is for python  >= 3.14 ###
+				#return self._download_path.copy_into(self._destination_file_path)
 		except:
 			Log.error(f'Unable to copy {download_file_path} to {self._destination_path}')
-		else:
-			return destination_file_path

@@ -44,6 +44,7 @@ class HTTPDownloader(HTMLParser):
 					sleep(self._delay)
 				else:
 					raise OSError(f'Unable to retrieve file list from {self._root}{path}.')
+					return list(), list()
 		self.feed(html)
 		dirs = list()
 		files = list()
@@ -66,7 +67,7 @@ class HTTPDownloader(HTMLParser):
 			Log.error(exception=ex)
 		else:
 			if name:
-				regex = re_compile(name) if name else None
+				regex = re_compile(name)
 				for path in self.files:
 					if regex.match(path.name):
 						yield path
@@ -74,39 +75,19 @@ class HTTPDownloader(HTMLParser):
 				for path in self.files:
 					yield path
 
-
-		'''
-		self._regex = re_compile(name) if name else None
-		for attempt in range(1, self._retries+1):
-			try:
-				with urlopen(self._url) as response:
-					html = response.read().decode('utf-8')
-			except:
-				if attempt < self._retries:
-					Log.debug(f'Attempt {attempt} to retrieve file list from {self._url} failed, retrying in {self._delay} seconds')
-					sleep(self._delay)
-				else:
-					Log.error(f'Unable to retrieve file list from {self._url}.')
-					return
-			else:
-				break
-		self.feed(html)
-		return self._hrefs
-		'''
-
-	def download(self, filename, local_dir_path):
+	def download(self, remote_file_path, local_dir_path):
 		'''Download file'''
-		local_path = local_dir_path / filename
-		url = f'{self._url}/{filename}'
-		Log.debug(f'Downloading {url} to {local_path}')
+		local_file_path = local_dir_path / remote_file_path
+		Log.debug(f'Downloading {self._root}{remote_file_path} to {local_dir_path}')
 		for attempt in range(1, self._retries+1):
 			try:
-				urlretrieve(url, local_path)
-				return local_path
+				urlretrieve(f'{self._root}{remote_file_path}', local_file_path)
 			except:
 				if attempt < self._retries:
-					Log.debug(f'Attempt {attempt} to download file {url} failed, retrying in {self._delay} seconds')
+					Log.debug(f'Attempt {attempt} to retrieve {remote_file_path} failed, retrying in {self._delay} seconds')
 					sleep(self._delay)
 				else:
-					Log.error(f'Unable to download {url}')
-					return
+					Log.error(f'Unable to download {self._root}{remote_file_path}')
+			else:
+				Log.debug(f'Received file {local_file_path}')
+				return local_file_path
