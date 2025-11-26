@@ -4,9 +4,10 @@
 from pathlib import Path
 from paramiko import SSHClient, AutoAddPolicy
 from time import sleep
-from re import match as re_match
+from re import compile as re_compile
 from stat import S_ISDIR
 from classes.logger import Logger as Log
+from re import compile as re_compile
 
 class SFTPDownloader:
 	'Tools to fetch files via SFTP'
@@ -68,8 +69,13 @@ class SFTPDownloader:
 		except Exception as ex:
 			Log.error(exception=ex)
 		else:
-			for path in self.files:
-				if not name or re_match(name, path.name):
+			if name:
+				regex = re_compile(name) if name else None
+				for path in self.files:
+					if regex.match(path.name):
+						yield path
+			else:
+				for path in self.files:
 					yield path
 
 	def download(self, remote_file_path, local_dir_path):
