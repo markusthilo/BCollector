@@ -6,7 +6,7 @@ __version__ = '0.4.0_2025-11-26'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
-__description__ = 'Sync remote and local files. HTTP and SFTP are possible protocols. Forward to final destination, decrypt gpg encrypted files.'
+__description__ = 'Sync remote and local files. HTTP(S) and SFTP are possible protocols. Forward to final destination, decryptPGP/GPG encrypted files.'
 
 from datetime import datetime
 from time import sleep
