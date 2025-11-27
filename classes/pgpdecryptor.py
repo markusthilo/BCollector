@@ -18,7 +18,7 @@ class PGPDecryptor:
 
 	def decrypt(self, enc_file_path, dst_dir_path):
 		'''Write decrypted file'''
-		dst_file_path = dst_dir_path / enc_file_path.name.rstrip('.pgp').rstrip('.gpg')
+		dst_file_path = dst_dir_path / enc_file_path.name[:-4]
 		try:
 			with open(enc_file_path, 'rb') as f:
 				decrypted_data = self._gpg.decrypt_file(f, passphrase=self._passphrase)

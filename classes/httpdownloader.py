@@ -26,33 +26,37 @@ class HTTPDownloader(HTMLParser):
 		'''Customize urllib.request'''
 		if tag == 'a':
 			for attr, value in attrs:
-				if attr == 'href' and self.REGEX_IN_HREF.match(value):
+				if attr == 'href' and value and not value.startswith('?') and value != '/' and self.REGEX_IN_HREF.match(value):
 					self._hrefs.append(value)
 
 	def iterdir(self, path):
 		'''Iterate over remote directory'''
 		for attempt in range(1, self._retries+1):
 			self._hrefs = list()
+			url = self._root
+			if path != Path(''):
+				url += f'{path}'.replace('\\', '/')
+			Log.debug(f'Fetching HTML data from {url}')
 			try:
-				with urlopen(f'{self._root}{path}') as response:
+				with urlopen(url) as response:
 					html = response.read().decode('utf-8')
 			except:
 				if path != Path(''):
 					return list(), list()
 				if attempt < self._retries:
-					Log.debug(f'Attempt {attempt} to retrieve file list from {self._root}{path} failed, retrying in {self._delay} seconds')
+					Log.debug(f'Attempt {attempt} to retrieve file list from {url} failed, retrying in {self._delay} seconds')
 					sleep(self._delay)
 				else:
-					raise OSError(f'Unable to retrieve file list from {self._root}{path}.')
+					raise OSError(f'Unable to retrieve file list from {url}.')
 					return list(), list()
 		self.feed(html)
 		dirs = list()
 		files = list()
 		for href in self._hrefs:
 			if href.endswith('/'):
-				dirs.append(path / href)
+				dirs.append(path / href.lstrip('/'))
 			else:
-				files.append(path / href)
+				files.append(path / href.lstrip('/'))
 		self.dirs.extend(dirs)
 		self.files.extend(files)
 		for dir_path in dirs:
@@ -81,7 +85,7 @@ class HTTPDownloader(HTMLParser):
 		Log.debug(f'Downloading {self._root}{remote_file_path} to {local_dir_path}')
 		for attempt in range(1, self._retries+1):
 			try:
-				urlretrieve(f'{self._root}{remote_file_path}', local_file_path)
+				urlretrieve(f'{self._root}{remote_file_path}'.replace('\\', '/'), local_file_path)
 			except:
 				if attempt < self._retries:
 					Log.debug(f'Attempt {attempt} to retrieve {remote_file_path} failed, retrying in {self._delay} seconds')

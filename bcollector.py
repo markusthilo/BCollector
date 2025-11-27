@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.4.0_2025-11-26'
+__version__ = '0.4.0_2025-11-27'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -31,7 +31,7 @@ class BCollector:
 		decryptor = None
 	):
 		'''Definitions'''
-		self._url = url.rstrip('/')
+		self._url = f'{url.rstrip("/")}/'
 		self._local = LocalDirs(download_path, destination_path, decryptor=decryptor)
 		protocol = self._url.split(':', 1)[0].lower()
 		if protocol == 'http':
@@ -42,9 +42,9 @@ class BCollector:
 			raise ValueError(f'Unknown protocol {protocol}')
 
 	def find(self, name=None):
-		'''List remote files, regex filter filename'''
-		for path in self._downloader.find(name):
-			yield path
+		'''List remote files'''
+		for path in self._downloader.find(name=name):
+			yield path, self._url + f'{path}'.replace('\\', '/')
 
 	def download(self, name=None):
 		'''Download files'''
@@ -54,8 +54,11 @@ class BCollector:
 			download_file_path = self._downloader.download(relative_path, self._local._download_path)
 			if download_file_path:
 				Log.info(f'Downloaded {download_file_path}')
+				Log.debug(f'Forwarding {download_file_path}')
 				if destination_file_path := self._local.forward(download_file_path):
 					Log.info(f'Created {destination_file_path}')
+				else:
+					Log.error(f'Unable to forward {download_file_path}')
 		else:
 			Log.info(f'No new files found')
 
@@ -141,9 +144,9 @@ if __name__ == '__main__':	# start here if called as application
 	)
 	if Log.debugging():
 		if args.simulate:
-			Log.info('Starting fetching remote structure')
-			for path in collector.find(name=name):
-				Log.info(f'{path}')
+			Log.info('Reading remote structure')
+			for path, url in collector.find(name=name):
+				Log.info(f'Seeing file: {path} / URL: {url}')
 		else:
 			Log.info('Starting download on debug level now and for once')
 			collector.download(name=name)

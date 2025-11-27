@@ -56,19 +56,19 @@ class LocalDirs:
 		except:
 			Log.error(f'Unable to create destination directory {destination_file_path.parent}')
 			return
-		if self._decryptor.suffix_match(download_file_path):
+		if self._decryptor and self._decryptor.suffix_match(download_file_path):
 			destination_file_path = self._decryptor.decrypt(download_file_path, self._destination_path)
 			if destination_file_path:
 				Log.info(f'Decrypted {download_file_path} to {destination_file_path}')
 				return destination_file_path
 		try:
 			if destination_file_path.exists():
-				Log.warning(f'File {destination_file_path} already exists, skipping copy attempt')
+				Log.warning(f'File {destination_file_path} already exists,skipping copy attempt')
 				return
-			else:
-				destination_file_path.write_bytes(download_file_path.read_bytes())
-				return destination_file_path
-				### this is for python  >= 3.14 ###
-				#return self._download_path.copy_into(self._destination_file_path)
+			### this is for python < 3.14 ###
+			#destination_file_path.write_bytes(download_file_path.read_bytes())
+			### this works for python  >= 3.14 ###
+			download_file_path.copy(destination_file_path)
+			return destination_file_path
 		except:
 			Log.error(f'Unable to copy {download_file_path} to {self._destination_path}')

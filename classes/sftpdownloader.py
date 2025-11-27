@@ -39,15 +39,16 @@ class SFTPDownloader:
 
 	def iterdir(self, path):
 		'''Iterate over remote directory'''
+		path_str = f'{path}'.replace('\\', '/')
 		for attempt in range(1, self._retries+1):
 			try:
-				items = self._sftp.listdir_attr(f'{path}')
+				items = self._sftp.listdir_attr(path_str)
 			except:
 				if attempt < self._retries:
-					Log.debug(f'Attempt {attempt} to retieve {self._root}{path} failed, retrying in {self._delay} seconds')
+					Log.debug(f'Attempt {attempt} to retieve {self._root}{path_str} failed, retrying in {self._delay} seconds')
 					sleep(self._delay)
 				else:
-					raise OSError(f'Unable to retrieve file list from {self._root}{path}')
+					raise OSError(f'Unable to retrieve file list from {self._root}{path_str}')
 					return list(), list()
 		dirs = list()
 		files = list()
@@ -81,16 +82,17 @@ class SFTPDownloader:
 	def download(self, remote_file_path, local_dir_path):
 		'''Download file'''
 		local_file_path = local_dir_path / remote_file_path
-		Log.info(f'Downloading {self._root}{remote_file_path} to {local_dir_path}')
+		remote_file_str = f'{remote_file_path}'.replace('\\', '/')
+		Log.info(f'Downloading {remote_file_str} to {local_dir_path}')
 		for attempt in range(1, self._retries + 1):
 			try:
-				self._sftp.get(f'{remote_file_path}', f'{local_file_path}')
+				self._sftp.get(remote_file_str, f'{local_file_path}')
 			except:
 				if attempt < self._retries:
-					Log.debug(f'Attempt {attempt} of {self._retries} to retrieve {remote_file_path} failed, retrying in {self._delay} seconds')
+					Log.debug(f'Attempt {attempt} of {self._retries} to retrieve {remote_file_str} failed, retrying in {self._delay} seconds')
 					sleep(self._delay)
 				else:
-					Log.error(f'Unable to download {remote_file_path}')
+					Log.error(f'Unable to download {remote_file_str}')
 			else:
 				Log.debug(f'Received file {local_file_path}')
 				return local_file_path
