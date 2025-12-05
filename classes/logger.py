@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
-from traceback import format_tb, format_exc
+from traceback import format_exc
 from sys import stdout, exc_info, exit
 from datetime import datetime
 from zipfile import ZipFile, ZIP_DEFLATED

@@ -22,7 +22,7 @@ class HTTPDownloader(HTMLParser):
 		self.dirs = list()
 		self.files = list()
 	
-	def open_connection(self):
+	def open(self):
 		'''Dummy method'''
 		return True
 
@@ -99,7 +99,3 @@ class HTTPDownloader(HTMLParser):
 			else:
 				Log.debug(f'Received file {local_file_path}')
 				return local_file_path
-
-	def close_connection(self):
-		'''Dummy method'''
-		return True

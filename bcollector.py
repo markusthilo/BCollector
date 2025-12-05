@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.4.0_2025-11-27'
+__version__ = '0.4.1_2025-12-05'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -41,6 +41,10 @@ class BCollector:
 		else:
 			raise ValueError(f'Unknown protocol {protocol}')
 
+	def open_connection(self):
+		'''Open connection if necessary'''
+		return self._downloader.open_connection()
+
 	def find(self, name=None):
 		'''List remote files'''
 		for path in self._downloader.find(name=name):
@@ -62,9 +66,13 @@ class BCollector:
 		else:
 			Log.info(f'No new files found')
 
+	def close_connection(self):
+		'''Close connection if necessary'''
+		return self._downloader.close_connection()
+
 	def loop(self, logger, delay=None, hours=None, minutes=None, clean=None, keep=0):
 		'''Endless loop for daemon mode'''
-		delay = delay if delay else 10
+		delay = delay * 60 if delay else 60
 		keep_sec = keep * 2629746	# time delta from months to seconds
 		Log.info(f'Starting main loop: delay = {delay}s, hours = {hours}, minutes = {minutes}, clean = {clean}h, keep = {keep} month(s)')
 		while True:
@@ -74,7 +82,9 @@ class BCollector:
 				self._local.clean_download(keep_sec)
 			if ( not hours or now.hour in hours ) and ( not minutes or now.minute in minutes ):
 				Log.info(f'Checking for new remote files')
+				self.open_connection()
 				self.download()
+				self.close_connection()
 			try:
 				logger.check_size()
 			except:
@@ -143,6 +153,7 @@ if __name__ == '__main__':	# start here if called as application
 		decryptor = decryptor
 	)
 	if Log.debugging():
+		collector.open_connection()
 		if args.simulate:
 			Log.info('Reading remote structure')
 			for path, url in collector.find(name=name):
@@ -150,6 +161,7 @@ if __name__ == '__main__':	# start here if called as application
 		else:
 			Log.info('Starting download on debug level now and for once')
 			collector.download(name=name)
+		collector.close_connection()
 		Log.info('Done')
 		exit(0)
 	def parse(string):

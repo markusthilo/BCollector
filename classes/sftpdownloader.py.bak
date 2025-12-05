@@ -13,17 +13,17 @@ class SFTPDownloader:
 
 	def __init__(self, url, pw, timeout=None, retries=None, delay=None):
 		'Initialze object and connect to server'
-		self._pw = pw
+		self.pw = pw
 		self._root, _, user_host_port, sub = url.split('/', 3)
 		self._path = Path(sub)
 		try:
-			self._user, host_port = user_host_port.split('@', 1)
+			self.user, host_port = user_host_port.split('@', 1)
 		except ValueError:
-			self._user, host_port = '', user_host_port
+			self.user, host_port = '', user_host_port
 		try:
-			self._host, self._port = host_port.split(':', 1)
+			self.host, self.port = host_port.split(':', 1)
 		except ValueError:
-			self._host, self._port = host_port, 22
+			self.host, self.port = host_port, 22
 		self._root += f'//{user_host_port.rstrip("/")}/'
 		self._timeout = timeout if timeout else 30
 		self._retries = retries if retries else 10
@@ -37,16 +37,16 @@ class SFTPDownloader:
 			self._ssh = SSHClient()
 			self._ssh.set_missing_host_key_policy(AutoAddPolicy())
 			self._ssh.connect(
-				hostname = self._host,
-				port = self._port,
-				username = self._user,
-				password = self._pw,
-				timeout = self._timeout
+				hostname = self.host,
+				port = self.port,
+				username = self.user,
+				password = self.pw,
+				timeout = self.timeout
 			)
 			self._sftp = self._ssh.open_sftp()
 		except Exception as ex:
 			Log.error(
-				message = f'Unable to connect to {self._host}:{self._port} as {self._user}',
+				message = f'Unable to connect to {self.host}:{self.port} as {self.user}',
 				exception = ex
 			)
 			return False
