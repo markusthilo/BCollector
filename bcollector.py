@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.4.1_2025-12-05'
+__version__ = '0.4.2_2025-12-27'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -28,11 +28,13 @@ class BCollector:
 		timeout = None,
 		retries = None,
 		delay = None,
-		decryptor = None
+		decryptor = None,
+		wait = False,
+		trigger = None
 	):
 		'''Definitions'''
 		self._url = f'{url.rstrip("/")}/'
-		self._local = LocalDirs(download_path, destination_path, decryptor=decryptor)
+		self._local = LocalDirs(download_path, destination_path, decryptor=decryptor, trigger=trigger)
 		protocol = self._url.split(':', 1)[0].lower()
 		if protocol == 'http':
 			self._downloader = HTTPDownloader(url, retries=retries, delay=delay)
@@ -40,6 +42,9 @@ class BCollector:
 			self._downloader = SFTPDownloader(url, password, timeout=timeout, retries=retries, delay=delay)
 		else:
 			raise ValueError(f'Unknown protocol {protocol}')
+		self._wait = wait
+		self._trigger = bool(trigger)
+		self._new_file_paths = list()
 
 	def open_connection(self):
 		'''Open connection if necessary'''
@@ -57,18 +62,33 @@ class BCollector:
 				continue
 			download_file_path = self._downloader.download(relative_path, self._local._download_path)
 			if download_file_path:
+				self._new_file_paths.append(download_file_path)
 				Log.info(f'Downloaded {download_file_path}')
-				Log.debug(f'Forwarding {download_file_path}')
-				if destination_file_path := self._local.forward(download_file_path):
-					Log.info(f'Created {destination_file_path}')
-				else:
-					Log.error(f'Unable to forward {download_file_path}')
-		else:
-			Log.info(f'No new files found')
+		return bool(self._new_file_paths)
 
 	def close_connection(self):
 		'''Close connection if necessary'''
 		return self._downloader.close_connection()
+
+	def forward(self, downloaded_paths):
+		'''Forward downloaded files to final destination'''
+		if not downloaded_paths:
+			return False
+		if self._wait and self._local.destination_dir_exists():
+			Log.debug(f'Destination directory {self._local._destination_path} exists')
+			return True
+		not_forwarded_paths = list()
+		for download_file_path in downloaded_paths:
+			Log.debug(f'Forwarding {download_file_path}')
+			if destination_file_path := self._local.forward(download_file_path):
+				Log.info(f'Created {destination_file_path}')
+			else:
+				not_forwarded_paths.append(download_file_path)
+				Log.error(f'Unable to forward {download_file_path}')
+		if self._trigger and not not_forwarded_paths:
+			self._local.write_trigger()
+		self._new_file_paths = not_forwarded_paths
+		return bool(not_forwarded_paths)
 
 	def loop(self, logger, delay=None, hours=None, minutes=None, clean=None, keep=0):
 		'''Endless loop for daemon mode'''
@@ -83,8 +103,9 @@ class BCollector:
 			if ( not hours or now.hour in hours ) and ( not minutes or now.minute in minutes ):
 				Log.info(f'Checking for new remote files')
 				self.open_connection()
-				self.download()
+				new_files = self.download()
 				self.close_connection()
+				self.
 			try:
 				logger.check_size()
 			except:
@@ -100,6 +121,10 @@ if __name__ == '__main__':	# start here if called as application
 		metavar = 'FILE',
 		default = default_config_path
 	)
+	argparser.add_argument('-d', '--debug',
+		action = 'store_true',
+		help = 'Set log level to debug (overwrites -l/--loglevel)',
+	)
 	argparser.add_argument('-l', '--loglevel',
 		type = str,
 		help = 'Log level: debug, info (default), warning, error or critical',
@@ -112,7 +137,7 @@ if __name__ == '__main__':	# start here if called as application
 		help = 'Simulate: connect to server and list file, do not download any data',
 	)
 	args = argparser.parse_args()
-	logger = Log('debug') if args.simulate else Log(args.loglevel)
+	logger = Log('debug') if args.simulate or args.debug else Log(args.loglevel)
 	config_none = ('', 'none', 'no', 'false', '0')
 	try:
 		config = ConfigParser()
@@ -142,6 +167,8 @@ if __name__ == '__main__':	# start here if called as application
 			Log.critical(f'Unknown encryption: {encryption}')
 	else:
 		decryptor = None
+	trigger = config['LOCAL'].get('trigger')
+	trigger_path = Path(trigger) if trigger else None
 	collector = BCollector(
 		config['REMOTE'].get('url'),
 		Path(config['LOCAL'].get('download')),
@@ -150,7 +177,9 @@ if __name__ == '__main__':	# start here if called as application
 		timeout = config['REMOTE'].getint('timeout'),
 		retries = config['REMOTE'].getint('retries'),
 		delay = config['REMOTE'].getint('delay'),
-		decryptor = decryptor
+		decryptor = decryptor,
+		wait = config['REMOTE'].getboolean('wait'),
+		trigger = trigger_path
 	)
 	if Log.debugging():
 		collector.open_connection()
@@ -160,7 +189,12 @@ if __name__ == '__main__':	# start here if called as application
 				Log.info(f'Seeing file: {path} / URL: {url}')
 		else:
 			Log.info('Starting download on debug level now and for once')
-			collector.download(name=name)
+			if collector.download(name=name):
+				Log.debug('Downloaded new files')
+				if collector.forward(collector._new_file_paths):
+					Log.error('Could not forward all new files')
+				else:
+					Log.debug('Forwarded all new files')
 		collector.close_connection()
 		Log.info('Done')
 		exit(0)

@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from os import getpid, getlogin
+from socket import gethostname
 from datetime import datetime
 from classes.logger import Logger as Log
 
 class LocalDirs:
 	'''Handle the backup'''
 
-	def __init__(self, download_dir_path, destination_dir_path, decryptor=None):
+	def __init__(self, download_dir_path, destination_dir_path, decryptor=None, trigger=None):
 		self._download_path = download_dir_path
 		self._destination_path = destination_dir_path
 		self._decryptor = decryptor
+		if trigger:
+			self._trigger_path = trigger
+			self._id = f'host: {gethostname()}\nuser: {getlogin()}\npid: {getpid()}'
+		else:
+			self._trigger_path = None
+			self._id = None
 
 	def rglob_download(self):
 		'''List files in download directory'''
@@ -48,6 +56,10 @@ class LocalDirs:
 			Log.error(f'Unable to create download directory {download_dir_path}')
 		return download_dir_path
 
+	def destination_dir_exists(self):
+		'''Check if destination directory exists'''
+		return self._destination_path.exists() 
+
 	def forward(self, download_file_path):
 		'''Forward file from download to destination'''
 		destination_file_path = self._destination_path.joinpath(download_file_path.relative_to(self._download_path))
@@ -66,9 +78,20 @@ class LocalDirs:
 				Log.warning(f'File {destination_file_path} already exists,skipping copy attempt')
 				return
 			### this is for python < 3.14 ###
-			#destination_file_path.write_bytes(download_file_path.read_bytes())
+			destination_file_path.write_bytes(download_file_path.read_bytes())
 			### this works for python  >= 3.14 ###
-			download_file_path.copy(destination_file_path)
+			# download_file_path.copy(destination_file_path)
 			return destination_file_path
 		except:
 			Log.error(f'Unable to copy {download_file_path} to {self._destination_path}')
+
+	def write_trigger(self):
+		'''Write trigger file for download file'''
+		if self._trigger_path:
+			try:
+				self._trigger_path.write_text(self._id, encoding='utf8')
+			except:
+				Log.error(f'Unable to create trigger file {self._trigger_path}')
+			else:
+				Log.info(f'Wrote trigger file {self._trigger_path}')
+				return self._trigger_path
