@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.4.2_2025-12-28'
+__version__ = '0.4.2_2025-12-29'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -26,6 +26,7 @@ class BCollector:
 	'''Sync loacl with remote'''
 
 	def __init__(self, url, download_path, destination_path, db_path,
+		name = None,
 		password = None,
 		timeout = None,
 		retries = None,
@@ -33,9 +34,11 @@ class BCollector:
 		decryptor = None,
 		wait = False,
 		trigger = None,
-		keep = 0
+		keep_files = None,
+		keep_entries = None
 	):
 		'''Definitions'''
+		self._name = name
 		self._url = f'{url.rstrip("/")}/'
 		self._local = LocalDirs(download_path, destination_path, decryptor=decryptor, trigger=trigger)
 		self._db = FileDB(db_path)
@@ -48,20 +51,28 @@ class BCollector:
 			raise ValueError(f'Unknown protocol {protocol}')
 		self._wait = wait
 		self._trigger = bool(trigger)
-		self._keep = keep * 60	# from minutes to seconds
-		self._new_file_paths = list()
+		self._keep_files = keep_files * 60 if keep_files else 0	# from minutes to seconds
+		self._keep_entries = keep_entries * 60 if keep_entries else 0	# from minutes to seconds
 
-	def find(self, name=None):
+	def find(self):
 		'''List remote files'''
 		self._downloader.open_connection()
-		for path in self._downloader.find(name=name):
+		for path in self._downloader.find(name=self._name):
 			yield path, self._url + f'{path}'.replace('\\', '/')
 		self._downloader.close_connection()
 
-	def download(self, name=None):
+	def open_db(self):
+		'''Open database'''
+		self._db.open()
+
+	def close_db(self):
+		'''Close database'''
+		self._db.close()
+
+	def download(self):
 		'''Download files'''
 		self._downloader.open_connection()
-		for relative_path in set(self._downloader.find(name=name)) - set(self._db.get_all()):
+		for relative_path in set(self._downloader.find(name=self._name)) - set(self._db.get_all()):
 			if self._local.mk_download_dir(relative_path):
 				download_file_path = self._downloader.download(relative_path, self._local.download_path)
 				if download_file_path:
@@ -74,37 +85,50 @@ class BCollector:
 		if self._wait and self._local.destination_path.exists():
 			Log.debug(f'Destination directory {self._local.destination_path} exists')
 			return 0
-		forwarded = 0
+		forwarded = False
 		for relative_path in self._db.get_not_forwarded():
 			if destination_file_path := self._local.forward(relative_path):
-				self._db.mark_forward(relative_path)
-				forwarded += 1
-				if not self._keep:
-					self._db.delete(relative_path)
 				Log.info(f'Created {destination_file_path}')
+				forwarded = True
+				self._db.mark_forward(relative_path)
 			else:
 				Log.error(f'Unable to forward {relative_path}')
 		if self._trigger and forwarded:
 			self._local.write_trigger()
-		return forwarded
 
-	def loop(self, log=None, hours=None, minutes=None, clean=None):
+	def clean(self):
+		'''Remove expired downloaded files and entries in data base'''
+		now_ts = int(datetime.now().timestamp())
+		if self._keep_files:
+			Log.debug('Looking for expired downloaded files')
+			for relative_path in self._db.get_older_than(now_ts - self._keep_files):
+				if (
+					self._db.get_forward_date(relative_path)
+					and not self._db.get_delete_date(relative_path)
+					and self._local.rm_downloaded_file(relative_path)
+				):
+					self._db.mark_delete(relative_path)
+			self._local.rm_download_dirs()
+		if self._keep_entries:
+			Log.debug('Looking for expired database entries')
+			for relative_path in self._db.get_older_than(now_ts - self._keep_entries):
+				if (
+					not self._local.is_in_download(relative_path)
+					and self._db.get_forward_date(relative_path)
+					and self._db.get_delete_date(relative_path)
+				):
+					self._db.delete(relative_path)
+
+	def loop(self, log=None, hours=None, minutes=None):
 		'''Endless loop for daemon mode'''
-		Log.info(f'Starting main loop: hours = {hours}, minutes = {minutes}, clean = {clean}h, keep = {self._keep} minute(s)')
-		clean_ts = check_ts = 0
+		Log.info(f'Starting main loop: hours = {hours}, minutes = {minutes}')
+		check_ts = 0
 		while True:
 			now = datetime.now()
 			now_ts = int(now.timestamp())
-			if self._keep and clean and clean == now.hour and now_ts - clean_ts >= 3600:
-				Log.info(f'Looking for expired downloaded files')
-				expired = tuple(relative_path in self._db.get_older_than(now_ts - self._keep))
-				if expired:
-					Log.info(f'Found {len(expired)} expired files')
-					for relative_path in self._local.clean_download(expired):
-						self._db.delete(relative_path)
-				clean_ts = now_ts
 			if (not hours or now.hour in hours) and (not minutes or now.minute in minutes) and now_ts - check_ts >= 60:
 				Log.info('Checking')
+				self.open_db()
 				Log.debug('Checking remote location')
 				try:
 					self.download()
@@ -119,6 +143,14 @@ class BCollector:
 					Log.error('A problem occured while checking for files to forward')
 				else:
 					Log.debug('Finished checking local downloads')
+				Log.debug(f'Looking for expired files')
+				try:
+					self.clean()
+				except:
+					Log.error('A problem occured while cleaning up')
+				else:
+					Log.debug('Finished cleaning up')
+				self.close_db()
 				if log:
 					Log.debug('Checking log file size')
 					try:
@@ -191,6 +223,7 @@ if __name__ == '__main__':	# start here if called as application
 		config.getpath('download'),
 		config.getpath('destination'),
 		config.getpath('db'),
+		name = name,
 		password = config['REMOTE'].get('password'),
 		timeout = config['REMOTE'].getint('timeout'),
 		retries = config['REMOTE'].getint('retries'),
@@ -198,19 +231,20 @@ if __name__ == '__main__':	# start here if called as application
 		decryptor = decryptor,
 		wait = config['LOCAL'].getboolean('wait'),
 		trigger = config.getpath('trigger'),
-		keep = config['LOCAL'].getint('keep', 0)
+		keep_files = config['LOCAL'].getint('keep_files', 0),
+		keep_entries = config['LOCAL'].getint('keep_entries', 0)
 	)
 	if args.simulate:
 		Log.info('Reading remote structure')
-		for path, url in collector.find(name=name):
+		for path, url in collector.find():
 			Log.info(f'Seeing file: {path} / URL: {url}')
 	elif config['LOOP'].getboolean('enable'):
 		Log.info('Starting main loop')
 		try:
-			collector.loop(logger,
+			collector.loop(
+				log = logger,
 				hours = config.getloop('hours'),
-				minutes = config.getloop('minutes'),
-				clean = config['LOOP'].get('clean')
+				minutes = config.getloop('minutes')
 			)
 		except KeyboardInterrupt:
 			print()
@@ -218,7 +252,10 @@ if __name__ == '__main__':	# start here if called as application
 			exit(0)
 	else:
 		Log.info('Starting download')
-		collector.download(name=name)
+		collector.open_db()
+		collector.download()
 		collector.forward()
+		collector.clean()
+		collector.close_db()
 	Log.info('Done')
 	exit(0)

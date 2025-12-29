@@ -15,7 +15,7 @@ class Config(ConfigParser):
 	def getpath(self, key):
 		'''Get pathlib.Path object'''
 		string = self['LOCAL'].get(key)
-		if string:
+		if string and not string.lower() in ('', 'no', 'none', 'null'):
 			return Path(string)
 
 	def getloop(self, key):

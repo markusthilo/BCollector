@@ -66,26 +66,33 @@ class LocalDirs:
 				Log.info(f'Wrote trigger file {self._trigger_path}')
 				return self._trigger_path
 
-	def clean_download(self, relative_paths):
-		'''Delete all given files in download directory'''
-		dirs = dict()
-		deleted = list()
-		for relative_path in relative_paths:
-			path = self.download_path.joinpath(relative_path)
-			if path.is_dir():
-				dirs[path] = len(path.parents)
-			if path.is_file():	# remove file
-				try:
-					path.unlink()
-				except:
-					Log.error(f'Unable to remove file {path}')
-				else:
-					deleted.append(relative_path)
-					Log.info(f'Removed file {path}')
-		for path in sorted(dirs, key=dirs.get, reverse=True):	# remove empty directory
-			if not any(path.iterdir()):
-				try:
-					path.rmdir()
-				except:
-					Log.error(f'Unable to remove directory {path}')
-		return deleted
+	def is_in_download(self, relative_path):
+		'''Check if file is in download directory'''
+		return self.download_path.joinpath(relative_path).exists()
+
+	def rm_downloaded_file(self, relative_path):
+		'''Remove file from download directory'''
+		path = self.download_path.joinpath(relative_path)
+		try:
+			path.unlink()
+		except:
+			Log.error(f'Unable to remove file {path}')
+		else:
+			Log.info(f'Removed file {path}')
+			return path
+
+	def rm_download_dirs(self):
+		'''Remove directory from download directory'''
+		for path in sorted(
+			{path for path in self.download_path.rglob('*') if path.is_dir()},
+			key = lambda p: len(p.parents),
+			reverse= True
+		):
+			if any(path.iterdir()):
+				continue
+			try:
+				path.rmdir()
+			except:
+				Log.error(f'Unable to remove directory {path}')
+			else:
+				Log.info(f'Removed directory {path}')
