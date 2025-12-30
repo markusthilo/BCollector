@@ -30,13 +30,15 @@ Bcollector reads the configuration from one file. As configparser is used, INI f
 ### Example:
 ```
 [REMOTE]
-# url to sync with: http://host[:port]/..., https://host[:port]/... or sftp://user@host[:port]/...
-#url = http://localhost:8080/
-url = sftp://user@localhost/
+# remote location (url) to sync to
+#url = https://localhost/
+url = http://localhost:8080/
+#url = sftp://localhost/
 #password for sftp
-password = dummy
+#password = dummy
 # regular expression to select targetted files
-match = .*\.gpg
+match = *
+#match = .*\.gpg
 #match = ^[^.].*
 # timout connection attempt in seconds
 timeout = 30
@@ -46,31 +48,39 @@ retries = 10
 delay = 2
 # for encrypted files (pgp/gpg with synmmetric password is implemented), none to disable decryption
 encryption = pgp
+#encryption = none
 # passphrase to decrypt
 passphrase = dummy
 
 [LOCAL]
 # download directory (used to sync/check for new files)
-download = /home/neo/Public/download
+download = /home/neo/Public/test_download
 # destination directory to copy files to, decrypt on the way if set
-destination = /home/neo/Public/destination
+destination = /home/neo/Public/test_destination
 # log file
-logfile = /home/neo/Public/log.txt
+logfile = /home/neo/Public/test_log.txt
 # max. size of log file in MiB
-logsize = 16
+logsize = 32
+# database to track files
+db = /home/neo/Public/test-sqlite.db
+# set yes to delay forwarding until destination directory does not exist
+wait = yes
+# trigger file name to write into destination directory
+trigger = /home/neo/Public/test_trigger.txt
+# minutes to keep files in download directory
+keep_files = 1
+# minutes to keep entries in data base
+keep_entries = 2
 
 [LOOP]
+# enable endless loop with yes
+enable = no
 # hours of the day (every = every hour)
+# hours = 0, 3, 9, 12, 15, 18, 21
 hours = every
 # minutes of the hour when to start download attempt (every = every minute)
 #minutes = 8,18,28,38,48,58
 minutes = every
-# seconds that main loop is paused inbetween download attempts
-delay = 10
-# months to keep files in download directory, 0 not to purge download directory
-keep = 3
-# hour of the day to clean download directory
-clean = 23
 ```
 
 ## Legal Notice

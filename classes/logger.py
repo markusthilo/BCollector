@@ -56,11 +56,16 @@ class Logger:
 		'''Log error'''
 		Logger.exception('error', message = message)
 
-	@ staticmethod
+	@staticmethod
 	def critical(message=None, exception=None):
 		'''Log critical error'''
 		Logger.exception('critical', message=message)
 		exit(1)
+
+	@staticmethod
+	def write(msg):
+		'''Use print for console output'''
+		print(msg.strip(), flush=True)
 
 	def __init__(self, level='info'):
 		'''Define logging by given level and to given file'''
