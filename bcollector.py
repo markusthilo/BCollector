@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.4.2_2025-12-30'
+__version__ = '0.4.2_2026-01-09'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -19,7 +19,7 @@ from classes.localdirs import LocalDirs
 from classes.filedb import FileDB
 from classes.httpdownloader import HTTPDownloader
 from classes.sftpdownloader import SFTPDownloader
-from classes.pgpdecryptor import PGPDecryptor
+from classes.decryptors import PGPDecryptor, SevenZipDecryptor
 from classes.logger import Logger as Log
 
 class BCollector:
@@ -209,13 +209,16 @@ if __name__ == '__main__':	# start here if called as application
 		encryption = encryption.lower()
 		if encryption in config_none:
 			decryptor = None
-		elif encryption in ('pgp', 'gpg'):
+		if encryption:
 			try:
-				decryptor = PGPDecryptor(passphrase = config['REMOTE'].get('passphrase', ''))
+				if encryption in ('pgp', 'gpg'):
+					decryptor = PGPDecryptor(passphrase = config['REMOTE'].get('passphrase', ''))
+				elif encryption in ('7z', '7zip'):
+					decryptor = SevenZipDecryptor(passphrase = config['REMOTE'].get('passphrase', ''))
+				else:
+					Log.critical(f'Unknown encryption: {encryption}')
 			except:
 				Log.critical(f'Unable to setup decryptor for {encryption}')
-		else:
-			Log.critical(f'Unknown encryption: {encryption}')
 	else:
 		decryptor = None
 	collector = BCollector(

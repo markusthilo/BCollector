@@ -39,7 +39,10 @@ class LocalDirs:
 			Log.error(f'Unable to create destination directory {destination_file_path.parent}')
 			return
 		if self._decryptor and self._decryptor.suffix_match(download_file_path):
-			destination_file_path = self._decryptor.decrypt(download_file_path, self.destination_path)
+			try:
+				destination_file_path = self._decryptor.decrypt(download_file_path, self.destination_path)
+			except:
+				Log.error(f'Unable to open decrypted file {enc_file_path}')
 			if destination_file_path:
 				Log.info(f'Decrypted {download_file_path} to {destination_file_path}')
 				return destination_file_path
