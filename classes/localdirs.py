@@ -32,20 +32,17 @@ class LocalDirs:
 	def forward(self, relative_path):
 		'''Forward file from download to destination'''
 		download_file_path = self.download_path.joinpath(relative_path)
-		destination_file_path = self.destination_path.joinpath(relative_path)
+		destination_parent_path = self.destination_path.joinpath(relative_path).parent
 		try:
-			destination_file_path.parent.mkdir(parents=True, exist_ok=True)
+			destination_parent_path.mkdir(parents=True, exist_ok=True)
 		except:
-			Log.error(f'Unable to create destination directory {destination_file_path.parent}')
+			Log.error(f'Unable to create destination directory {destination_parent_path}')
 			return
 		if self._decryptor and self._decryptor.suffix_match(download_file_path):
-			try:
-				destination_file_path = self._decryptor.decrypt(download_file_path, self.destination_path)
-			except:
-				Log.error(f'Unable to open decrypted file {enc_file_path}')
-			if destination_file_path:
+			if destination_file_path := self._decryptor.decrypt(download_file_path, self.destination_path):
 				Log.info(f'Decrypted {download_file_path} to {destination_file_path}')
 				return destination_file_path
+		destination_file_path = self.destination_path.joinpath(relative_path)
 		try:
 			if destination_file_path.exists():
 				Log.warning(f'File {destination_file_path} already exists,skipping copy attempt')

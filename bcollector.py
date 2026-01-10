@@ -208,17 +208,17 @@ if __name__ == '__main__':	# start here if called as application
 	if encryption:
 		encryption = encryption.lower()
 		if encryption in config_none:
-			decryptor = None
-		if encryption:
-			try:
-				if encryption in ('pgp', 'gpg'):
-					decryptor = PGPDecryptor(passphrase = config['REMOTE'].get('passphrase', ''))
-				elif encryption in ('7z', '7zip'):
-					decryptor = SevenZipDecryptor(passphrase = config['REMOTE'].get('passphrase', ''))
-				else:
-					Log.critical(f'Unknown encryption: {encryption}')
-			except:
-				Log.critical(f'Unable to setup decryptor for {encryption}')
+			encryption = None
+	if encryption:
+		try:
+			if encryption in ('pgp', 'gpg'):
+				decryptor = PGPDecryptor(passphrase = config['REMOTE'].get('passphrase', ''))
+			elif encryption in ('7z', '7zip'):
+				decryptor = SevenZipDecryptor(passphrase = config['REMOTE'].get('passphrase', ''))
+			else:
+				Log.critical(f'Unknown encryption: {encryption}')
+		except:
+			Log.critical(f'Unable to setup decryptor for {encryption}')
 	else:
 		decryptor = None
 	collector = BCollector(

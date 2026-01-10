@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.request import urlopen, urlretrieve
 from time import sleep
 from html.parser import HTMLParser
+from urllib.parse import quote, unquote
 from re import compile as re_compile
 from classes.logger import Logger as Log
 
@@ -33,20 +34,20 @@ class HTTPDownloader(HTMLParser):
 				if attr == 'href' and value and not value.startswith('?') and value != '/' and self.REGEX_IN_HREF.match(value):
 					self._hrefs.append(value)
 
+	def _url(self, path):
+		'''Return URL'''
+		return self._root + quote(f'{path}'.replace('\\', '/'))
+
 	def iterdir(self, path):
 		'''Iterate over remote directory'''
+		url = self._url(path)
+		self._hrefs = list()
+		Log.debug(f'Fetching HTML data from {url}')
 		for attempt in range(1, self._retries+1):
-			self._hrefs = list()
-			url = self._root
-			if path != Path(''):
-				url += f'{path}'.replace('\\', '/')
-			Log.debug(f'Fetching HTML data from {url}')
 			try:
 				with urlopen(url) as response:
 					html = response.read().decode('utf-8')
 			except:
-				if path != Path(''):
-					return list(), list()
 				if attempt < self._retries:
 					Log.debug(f'Attempt {attempt} to retrieve file list from {url} failed, retrying in {self._delay} seconds')
 					sleep(self._delay)
@@ -57,10 +58,11 @@ class HTTPDownloader(HTMLParser):
 		dirs = list()
 		files = list()
 		for href in self._hrefs:
+			rel = unquote(href)
 			if href.endswith('/'):
-				dirs.append(path / href.lstrip('/'))
+				dirs.append(path / rel.lstrip('/'))
 			else:
-				files.append(path / href.lstrip('/'))
+				files.append(path / rel)
 		self.dirs.extend(dirs)
 		self.files.extend(files)
 		for dir_path in dirs:
@@ -85,17 +87,19 @@ class HTTPDownloader(HTMLParser):
 
 	def download(self, remote_file_path, local_dir_path):
 		'''Download file'''
+		url = self._url(remote_file_path)
+		Log.debug(f'Downloading {url} to {local_dir_path}')
 		local_file_path = local_dir_path / remote_file_path
-		Log.debug(f'Downloading {self._root}{remote_file_path} to {local_dir_path}')
+		Log.debug(f'{local_file_path=}')
 		for attempt in range(1, self._retries+1):
 			try:
-				urlretrieve(f'{self._root}{remote_file_path}'.replace('\\', '/'), local_file_path)
+				urlretrieve(url, local_file_path)
 			except:
 				if attempt < self._retries:
-					Log.debug(f'Attempt {attempt} to retrieve {remote_file_path} failed, retrying in {self._delay} seconds')
+					Log.debug(f'Attempt {attempt} to retrieve {url} failed, retrying in {self._delay} seconds')
 					sleep(self._delay)
 				else:
-					Log.error(f'Unable to download {self._root}{remote_file_path}')
+					Log.error(f'Unable to download {url}')
 			else:
 				Log.debug(f'Received file {local_file_path}')
 				return local_file_path
