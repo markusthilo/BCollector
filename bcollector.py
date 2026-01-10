@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 __author__ = 'Markus Thilo'
-__version__ = '0.4.2_2026-01-09'
+__version__ = '0.5.0_2026-01-10'
 __license__ = 'GPL-3'
 __email__ = 'markus.thilo@gmail.com'
 __status__ = 'Testing'
@@ -58,7 +58,7 @@ class BCollector:
 		'''List remote files'''
 		self._downloader.open_connection()
 		for path in self._downloader.find(name=self._name):
-			yield path, self._url + f'{path}'.replace('\\', '/')
+			yield path
 		self._downloader.close_connection()
 
 	def open_db(self):
@@ -84,7 +84,7 @@ class BCollector:
 		'''Forward downloaded files to final destination'''
 		if self._wait and self._local.destination_path.exists():
 			Log.debug(f'Destination directory {self._local.destination_path} exists')
-			return 0
+			return
 		forwarded = False
 		for relative_path in self._db.get_not_forwarded():
 			if destination_file_path := self._local.forward(relative_path):
@@ -239,8 +239,8 @@ if __name__ == '__main__':	# start here if called as application
 	)
 	if args.simulate:
 		Log.info('Reading remote structure')
-		for path, url in collector.find():
-			Log.info(f'Seeing file: {path} / URL: {url}')
+		for path in collector.find():
+			Log.info(f'Seeing file: {path}')
 	elif config['LOOP'].getboolean('enable'):
 		Log.info('Starting main loop')
 		try:

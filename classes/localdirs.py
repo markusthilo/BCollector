@@ -32,28 +32,29 @@ class LocalDirs:
 	def forward(self, relative_path):
 		'''Forward file from download to destination'''
 		download_file_path = self.download_path.joinpath(relative_path)
-		destination_parent_path = self.destination_path.joinpath(relative_path).parent
+		target_parent_path = self.destination_path.joinpath(relative_path).parent
+		target_path = None
 		try:
-			destination_parent_path.mkdir(parents=True, exist_ok=True)
+			target_parent_path.mkdir(parents=True, exist_ok=True)
 		except:
-			Log.error(f'Unable to create destination directory {destination_parent_path}')
+			Log.error(f'Unable to create destination directory {target_parent_path}')
 			return
 		if self._decryptor and self._decryptor.suffix_match(download_file_path):
-			if destination_file_path := self._decryptor.decrypt(download_file_path, self.destination_path):
-				Log.info(f'Decrypted {download_file_path} to {destination_file_path}')
-				return destination_file_path
-		destination_file_path = self.destination_path.joinpath(relative_path)
+			if target_path := self._decryptor.decrypt(download_file_path, self.destination_path):
+				return target_path
+		target_path = self.destination_path.joinpath(relative_path)
+		if target_path.exists():
+			Log.warning(f'File {target_path} already exists, skipping copy attempt')
+			return
 		try:
-			if destination_file_path.exists():
-				Log.warning(f'File {destination_file_path} already exists,skipping copy attempt')
-				return
 			### this is for python < 3.14 ###
-			destination_file_path.write_bytes(download_file_path.read_bytes())
+			target_path.write_bytes(download_file_path.read_bytes())
 			### this works for python  >= 3.14 ###
-			# download_file_path.copy(destination_file_path)
-			return destination_file_path
+			# target_path.copy(destination_file_path)
 		except:
-			Log.error(f'Unable to copy {download_file_path} to {self.destination_path}')
+			Log.error(f'Unable to copy {download_file_path} into {target_parent_path}')
+			return
+		return target_path
 
 	def write_trigger(self):
 		'''Write trigger file for download file'''

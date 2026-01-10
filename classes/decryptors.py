@@ -46,6 +46,7 @@ class SevenZipDecryptor:
 	def decrypt(self, enc_file_path, dst_dir_path):
 		'''Write decrypted file'''
 		name = enc_file_path.name[:-3]
+		target_path = dst_dir_path / name
 		try:
 			zf = SevenZipFile(enc_file_path, mode='r', password=self._passphrase)
 			ls = zf.list()
@@ -53,12 +54,21 @@ class SevenZipDecryptor:
 			Log.error(f'Unable to open file {enc_file_path}')
 			zf.close()
 			return
-		dst_path = dst_dir_path if len(ls) == 1 and ls[0].is_file and ls[0].filename == name else dst_dir_path / name
-		Log.debug(f'Decrypting/unpacking {enc_file_path} to {dst_path}')
-		try:
-			zf.extractall(dst_path)
-		except:
-			Log.error(f'Unable to extract file {enc_file_path}')
-			dst_path = None
+		if len(ls) == 1 and ls[0].is_file and ls[0].filename == name:
+			Log.debug(f'Decrypting/unpacking {enc_file_path} to {target_path}')
+			try:
+				zf.extractall(dst_dir_path)
+			except:
+				Log.error(f'Unable to decrypt/unpack {enc_file_path}')
+				zf.close()
+				return
+		else:
+			Log.debug(f'Decrypting/unpacking files from {enc_file_path} into {target_path}')
+			try:
+				zf.extractall(target_path)
+			except:
+				Log.error(f'Problems occured while decrypting/unpacking files from {enc_file_path}')
+				zf.close()
+				return
 		zf.close()
-		return dst_path
+		return target_path
