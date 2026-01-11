@@ -1,31 +1,27 @@
 # BCollector
-
 - Download files from a http, https or sftp server into your local infrastructure.
 - Copy or decrypt files to destination directory.
 - Keep backup in the download folder for a given period of time, delete obsolete files.
-- Works as daemon / in an andless loop.
-
+- Works as daemon / in an endless loop.
 ## Requirements
 Python 3.12 works fine. Newer versions should be no problem.
 
-In addition to the standard libraries python-gnupg and paramiko are required:
+In addition to the standard libraries `python-gnupg`, `py7zr` and `paramiko` are required:
 
 ```
-python -m pip install python-gnupg py7zr paramiko
+$ python -m pip install python-gnupg py7zr paramiko
 ```
 In case your download machine is offline, download the libraries on an online system:
 
 ```
-python -m pip download python-gnupg py7zr paramiko
+$ python -m pip download python-gnupg py7zr paramiko
 ```
 Transport the .whl files to the offline machine and execute:
 ```
-python -m pip install --no-index --find-links .\ python-gnupg paramiko
+$ python -m pip install --no-index --find-links .\ python-gnupg paramiko
 ```
-
 ## Configuration
-Bcollector reads the configuration from one file. As configparser is used, INI file syntax is used. The default is
-`bcollector.conf` in the directory of `bcollector.py`.
+Bcollector reads the configuration from one file. As `configparser` is used, INI file syntax is used. The default is `bcollector.conf` in the directory of `bcollector.py`.
 
 ### Example:
 ```
@@ -118,7 +114,7 @@ This translates to:
 - retry download attempt 10 times before throwing error
 - delay 2 seconds before new download attempt
 
-A special functionality is to decrypt files while transporting from the download folder to the final destination. GnuPG and 7-Zip is emplemented for now. The encryption is is indicated by `pgp`, `7z` or `none` for no encryption, e.g.:
+A special functionality is to decrypt files while transporting from the download folder to the final destination. GnuPG and 7-Zip is implemented for now. The encryption is is indicated by `pgp`, `7z` or `none` for no encryption, e.g.:
 ```
 encryption = pgp
 passphrase = ultrasecret
@@ -137,9 +133,9 @@ This translates to:
 - copy them to  `/home/user/Public` (possibly decrypt on the way)
 - write log to `/home/user/Logging/bcollector_log.txt`
 - compress old logs using ZIP (in same directory) and create a new log file
-- store infos about files as SQLite in `/home/user/.bcollector/files.db`
+- store infos about files as SQLite database in `/home/user/.bcollector/files.db`
 
-Running on Windows paths might use `/` or `\` (e.g. `C:\Users\User\Documents` is the same as `C:/Users/User/Documents`) as Python's pathlib is used.
+Running on Windows paths might use `/` or `\` (e.g. `C:\Users\User\Documents` is the same as `C:/Users/User/Documents`) as Python's `pathlib` is used.
 
 If you want to delay the transport from the download to the destination until the destination folder is delted, add
 ```
@@ -164,24 +160,41 @@ enable = yes
 This enables an endless loop that can be interrupted with "Control + C".
 
 The process is triggerd by hours and minutes. Examples:
-- every 10 minutes
+- every 10 minutes:
 ```
 hours = every
 minutes = 8, 18, 28, 38, 48, 58
 ```
-- at 02:10 and 14:10 (system time) every day
+- at 02:10 and 14:10 (system time) every day:
 ```
 hours = 2, 14
 minutes = 10
 ```
-- every minute (max. frequency)
+- every minute (max. frequency):
 ```
 hours = every
 minutes = every
 ```
 ## Command line
+BCollector is a command line tool. Get the options/switches using `-h`/`--help`:
+```
+$ python bcollector.py -h
+```
+You might try the connection given in `myconfig.conf` to the server with `-s`/`--simulate` before running as daemon:
 
+```
+$ python bcollector.py -c myconfig.conf -s
+```
+To increase the log level to DEBUG use `-d` or `-l debug`:
 
+```
+$ python bcollector.py -d
+```
+Without any options
+```
+$ python bcollector.py
+```
+runs the tool in log level INFO.
 ## Legal Notice
 ### License
 Respect GPL-3: https://www.gnu.org/licenses/gpl-3.0.en.html
