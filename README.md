@@ -80,7 +80,7 @@ enable = no
 # hours = 0, 3, 9, 12, 15, 18, 21
 hours = every
 # minutes of the hour when to start download attempt (every = every minute)
-#minutes = 8,18,28,38,48,58
+#minutes = 8, 18, 28, 38, 48, 58
 minutes = every
 ```
 ### REMOTE
@@ -92,7 +92,7 @@ or
 ```
 url = https://example.org/
 ```
-in the config file. For the SFTP protocoll the url is given in the following syntax:
+in the REMOTE section of the config file. For the SFTP protocoll the url is given in the following syntax:
 ```
 url = sftp://user@example.org/
 password = topsecret
@@ -113,7 +113,7 @@ timeout = 30
 retries = 10
 delay = 2
 ```
-This translate to:
+This translates to:
 - skip download attempt if there is no response for 30 seconds
 - retry download attempt 10 times before throwing error
 - delay 2 seconds before new download attempt
@@ -139,22 +139,52 @@ This translates to:
 - compress old logs using ZIP (in same directory) and create a new log file
 - store infos about files as SQLite in `/home/user/.bcollector/files.db`
 
-set yes to delay forwarding until destination directory does not exist
-wait = yes
-trigger file name to write into destination directory
-trigger = /home/neo/Public/test_trigger.txt
-minutes to keep files in download directory
-keep_files = 1
-minutes to keep entries in data base
-keep_entries = 2
+Running on Windows paths might use `/` or `\` (e.g. `C:\Users\User\Documents` is the same as `C:/Users/User/Documents`) as Python's pathlib is used.
 
+If you want to delay the transport from the download to the destination until the destination folder is delted, add
+```
+wait = yes
+```
+to the REMOTE section of the config file.
+
+To trigger further actions a trigger file can be created after files have been forwarded from the download to the destination folder:
+```
+trigger = /home/neo/Public/test_trigger.txt
+```
+Files in the download directory and entries in the SQLite database can be removed after a given time delta in minutes. Obviously this does not work if the entries in the database are deeted before removing the files. This example will keep a backup for 6 months:
+```
+keep_files = 262980
+keep_entries = 264420
+```
+### LOOP
+The tool can be run as a daemon:
+```
+enable = yes
+```
+This enables an endless loop that can be interrupted with "Control + C".
+
+The process is triggerd by hours and minutes. Examples:
+- every 10 minutes
+```
+hours = every
+minutes = 8, 18, 28, 38, 48, 58
+```
+- at 02:10 and 14:10 (system time) every day
+```
+hours = 2, 14
+minutes = 10
+```
+- every minute (max. frequency)
+```
+hours = every
+minutes = every
+```
+## Command line
 
 
 ## Legal Notice
-
 ### License
 Respect GPL-3: https://www.gnu.org/licenses/gpl-3.0.en.html
-
 ### Disclaimer
 Use the software on your own risk.
 
