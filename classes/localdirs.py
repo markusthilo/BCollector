@@ -40,7 +40,7 @@ class LocalDirs:
 			Log.error(f'Unable to create destination directory {target_parent_path}')
 			return
 		if self._decryptor and self._decryptor.suffix_match(download_file_path):
-			if target_path := self._decryptor.decrypt(download_file_path, self.destination_path):
+			if target_path := self._decryptor.decrypt(download_file_path, target_parent_path):
 				return target_path
 		target_path = self.destination_path.joinpath(relative_path)
 		if target_path.exists():
