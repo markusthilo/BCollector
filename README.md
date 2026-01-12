@@ -9,16 +9,16 @@ Python 3.12 works fine. Newer versions should be no problem.
 In addition to the standard libraries `python-gnupg`, `py7zr` and `paramiko` are required:
 
 ```
-$ python -m pip install python-gnupg py7zr paramiko
+python -m pip install python-gnupg py7zr paramiko
 ```
 In case your download machine is offline, download the libraries on an online system:
 
 ```
-$ python -m pip download python-gnupg py7zr paramiko
+python -m pip download python-gnupg py7zr paramiko
 ```
 Transport the .whl files to the offline machine and execute:
 ```
-$ python -m pip install --no-index --find-links .\ python-gnupg paramiko
+python -m pip install --no-index --find-links .\ python-gnupg paramiko
 ```
 ## Configuration
 Bcollector reads the configuration from one file. As `configparser` is used, INI file syntax is used. The default is `bcollector.conf` in the directory of `bcollector.py`.
@@ -178,21 +178,21 @@ minutes = every
 ## Command line
 BCollector is a command line tool. Get the options/switches using `-h`/`--help`:
 ```
-$ python bcollector.py -h
+python bcollector.py -h
 ```
 You might try the connection given in `myconfig.conf` to the server with `-s`/`--simulate` before running as daemon:
 
 ```
-$ python bcollector.py -c myconfig.conf -s
+python bcollector.py -c myconfig.conf -s
 ```
 To increase the log level to DEBUG use `-d` or `-l debug`:
 
 ```
-$ python bcollector.py -d
+python bcollector.py -d
 ```
 Without any options
 ```
-$ python bcollector.py
+python bcollector.py
 ```
 runs the tool in log level INFO.
 ## Legal Notice
