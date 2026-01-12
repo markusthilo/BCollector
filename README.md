@@ -18,7 +18,7 @@ python -m pip download python-gnupg py7zr paramiko
 ```
 Transport the .whl files to the offline machine and execute:
 ```
-python -m pip install --no-index --find-links .\ python-gnupg paramiko
+python -m pip install --no-index --find-links .\ python-gnupg py7zr paramiko
 ```
 ## Configuration
 Bcollector reads the configuration from one file. As `configparser` is used, INI file syntax is used. The default is `bcollector.conf` in the directory of `bcollector.py`.

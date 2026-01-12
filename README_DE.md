@@ -18,7 +18,7 @@ python -m pip download python-gnupg py7zr paramiko
 ```
 Übertragen Sie die .whl-Dateien auf den Offline-Rechner und führen Sie aus:
 ```
-python -m pip install --no-index --find-links .\ python-gnupg paramiko
+python -m pip install --no-index --find-links .\ python-gnupg py7zr paramiko
 ```
 ## Konfiguration
 BCollector liest die Konfiguration aus einer Datei. Da `configparser` verwendet wird, wird die INI-Dateisyntax verwendet. Der Standard ist `bcollector.conf` im Verzeichnis von `bcollector.py`.
