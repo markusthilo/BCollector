@@ -1,3 +1,6 @@
+> [!NOTE]
+> Migrated to https://codeberg.org/markusthilo/BCollector
+
 # BCollector
 - Download files from a http, https or sftp server into your local infrastructure.
 - Copy or decrypt files to destination directory.
